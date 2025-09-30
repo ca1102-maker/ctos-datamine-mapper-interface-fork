@@ -5,637 +5,1155 @@ import plotly.graph_objects as go
 from datetime import datetime, timedelta
 import random
 import math
+import json
+import io
+import base64
 
 # Page configuration
 st.set_page_config(
-    page_title="Frederick Platform",
+    page_title="Frederick Semantic Mapping Platform",
     page_icon="🔬",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for better styling
+# Custom CSS for dark theme interface
 st.markdown("""
     <style>
+    /* Main app background */
     .stApp {
-        background: linear-gradient(135deg, #1e1e2e 0%, #2d2d44 100%);
+        background: linear-gradient(135deg, #1a1a2e 0%, #0f0f1e 100%);
     }
+
+    /* Override Streamlit's default backgrounds */
+    .main {
+        background-color: transparent;
+    }
+
+    div[data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #16213e 0%, #0f1929 100%);
+    }
+
+    /* Headers */
     .main-header {
-        font-size: 2.5rem;
-        font-weight: bold;
-        background: linear-gradient(90deg, #4fc3f7, #29b6f6);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        margin-bottom: 2rem;
+        font-size: 2rem;
+        font-weight: 600;
+        color: #4fc3f7;
+        margin-bottom: 1.5rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 3px solid #4fc3f7;
     }
-    .metric-card {
+
+    /* Cards and containers */
+    .result-card {
         background: rgba(255, 255, 255, 0.05);
-        border-radius: 10px;
+        border-radius: 8px;
         padding: 1rem;
         border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        margin-bottom: 1rem;
     }
+
+    /* Buttons */
     .stButton > button {
-        background: linear-gradient(90deg, #4fc3f7, #29b6f6);
+        background: linear-gradient(90deg, #4fc3f7, #2196f3);
         color: white;
         border: none;
-        padding: 0.5rem 2rem;
-        border-radius: 8px;
-        font-weight: 600;
-        transition: transform 0.2s;
+        padding: 0.5rem 1.5rem;
+        border-radius: 6px;
+        font-weight: 500;
+        transition: all 0.3s;
     }
+
     .stButton > button:hover {
         transform: translateY(-2px);
-        box-shadow: 0 5px 15px rgba(79, 195, 247, 0.3);
+        box-shadow: 0 4px 12px rgba(79, 195, 247, 0.4);
     }
-    .chat-message {
+
+    /* Feedback boxes */
+    .feedback-box {
+        background: rgba(40, 167, 69, 0.1);
+        border-left: 4px solid #28a745;
         padding: 1rem;
-        border-radius: 10px;
-        margin-bottom: 1rem;
+        border-radius: 4px;
+    }
+
+    /* Links */
+    .annotation-link {
+        color: #4fc3f7;
+        text-decoration: none;
+        font-weight: 500;
+    }
+
+    .annotation-link:hover {
+        text-decoration: underline;
+        color: #29b6f6;
+    }
+
+    /* Metric boxes */
+    .metric-box {
         background: rgba(255, 255, 255, 0.05);
-        border-left: 3px solid #4fc3f7;
+        padding: 1.2rem;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    /* Metrics text */
+    div[data-testid="stMetricValue"] {
+        font-size: 2rem;
+        font-weight: 600;
+        color: #ffffff;
+    }
+
+    div[data-testid="stMetricDelta"] {
+        color: #4fc3f7;
+    }
+
+    /* Score indicators */
+    .mapping-score-high { color: #4caf50; font-weight: 600; }
+    .mapping-score-medium { color: #ffc107; font-weight: 600; }
+    .mapping-score-low { color: #f44336; font-weight: 600; }
+
+    /* Input fields */
+    .stTextInput > div > div > input {
+        background-color: rgba(255, 255, 255, 0.05);
+        color: white;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .stTextArea > div > div > textarea {
+        background-color: rgba(255, 255, 255, 0.05);
+        color: white;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .stSelectbox > div > div > div {
+        background-color: rgba(255, 255, 255, 0.05);
+        color: white;
+    }
+
+    /* Tables */
+    .dataframe {
+        background-color: rgba(255, 255, 255, 0.05);
+        color: white;
+    }
+
+    /* Expander */
+    .streamlit-expanderHeader {
+        background-color: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 4px;
+        color: white;
+    }
+
+    /* Tabs */
+    .stTabs [data-baseweb="tab-list"] {
+        background-color: rgba(255, 255, 255, 0.05);
+    }
+
+    .stTabs [data-baseweb="tab"] {
+        color: rgba(255, 255, 255, 0.7);
+        background-color: transparent;
+    }
+
+    .stTabs [aria-selected="true"] {
+        color: #4fc3f7;
+        background-color: rgba(79, 195, 247, 0.1);
+    }
+
+    /* Chat messages */
+    .stChatMessage {
+        background-color: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    /* Progress bar */
+    .stProgress > div > div > div {
+        background-color: #4fc3f7;
+    }
+
+    /* File uploader */
+    .uploadedFile {
+        background-color: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    /* Make all text white by default */
+    .markdown-text-container {
+        color: white;
+    }
+
+    h1, h2, h3, h4, h5, h6, p, span, div {
+        color: white;
+    }
+
+    /* Footer styling */
+    .footer-box {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        color: white;
     }
     </style>
 """, unsafe_allow_html=True)
 
 # Initialize session state
-if 'messages' not in st.session_state:
-    st.session_state.messages = []
-if 'uploaded_files' not in st.session_state:
-    st.session_state.uploaded_files = []
-if 'graph_data' not in st.session_state:
-    st.session_state.graph_data = None
+if 'mapping_results' not in st.session_state:
+    st.session_state.mapping_results = None
+if 'neo4j_data' not in st.session_state:
+    st.session_state.neo4j_data = None
+if 'feedback_history' not in st.session_state:
+    st.session_state.feedback_history = []
+if 'chat_messages' not in st.session_state:
+    st.session_state.chat_messages = []
+if 'current_query' not in st.session_state:
+    st.session_state.current_query = ""
 
-# Sidebar navigation
+
+# Helper Functions
+def export_data(data, format_type, filename_prefix):
+    """Export data in various formats"""
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    if format_type == "CSV":
+        csv = data.to_csv(index=False)
+        b64 = base64.b64encode(csv.encode()).decode()
+        href = f'<a href="data:file/csv;base64,{b64}" download="{filename_prefix}_{timestamp}.csv">📥 Download CSV</a>'
+        return href
+
+    elif format_type == "TSV":
+        tsv = data.to_csv(sep='\t', index=False)
+        b64 = base64.b64encode(tsv.encode()).decode()
+        href = f'<a href="data:file/tsv;base64,{b64}" download="{filename_prefix}_{timestamp}.tsv">📥 Download TSV</a>'
+        return href
+
+    elif format_type == "JSON":
+        json_str = data.to_json(orient='records', indent=2)
+        b64 = base64.b64encode(json_str.encode()).decode()
+        href = f'<a href="data:file/json;base64,{b64}" download="{filename_prefix}_{timestamp}.json">📥 Download JSON</a>'
+        return href
+
+
+def generate_mock_neo4j_data(query, num_results=10):
+    """Simulate Neo4j data retrieval"""
+    concepts = [
+        "Hypertension", "Diabetes Mellitus Type 2", "Chronic Kidney Disease",
+        "Atrial Fibrillation", "Heart Failure", "COPD", "Asthma",
+        "Migraine", "Depression", "Anxiety Disorder", "Pneumonia",
+        "COVID-19", "Influenza", "Osteoarthritis", "Rheumatoid Arthritis"
+    ]
+
+    match_types = ["Exact", "Synonym", "Broader", "Narrower", "Related"]
+    sources = ["SNOMED CT", "ICD-10", "LOINC", "RxNorm", "MedDRA"]
+
+    data = []
+    for i in range(num_results):
+        score = random.uniform(0.65, 1.0)
+        data.append({
+            'Source Term': query,
+            'Mapped Term': random.choice(concepts),
+            'Match Type': random.choice(match_types),
+            'Similarity Score': round(score, 3),
+            'Confidence': 'High' if score > 0.9 else 'Medium' if score > 0.75 else 'Low',
+            'Source': random.choice(sources),
+            'Concept ID': f"{random.choice(['C', 'D', 'S'])}{random.randint(100000, 999999)}",
+            'Semantic Type': random.choice(['Disease/Syndrome', 'Pharmacologic Substance',
+                                            'Laboratory Procedure', 'Clinical Attribute']),
+            'External Links': 'View in NCI | View in caDSR'
+        })
+
+    return pd.DataFrame(data)
+
+
+def create_neo4j_visualization(data):
+    """Create Neo4j-style graph visualization"""
+    nodes = []
+    edges = []
+
+    # Central node (query term)
+    central_term = data['Source Term'].iloc[0] if not data.empty else "Query"
+    nodes.append({'id': 0, 'label': central_term, 'type': 'query', 'x': 0, 'y': 0})
+
+    # Add mapped terms as nodes
+    num_nodes = min(len(data), 15)
+    for i in range(num_nodes):
+        angle = 2 * math.pi * i / num_nodes
+        radius = 2
+        x = radius * math.cos(angle)
+        y = radius * math.sin(angle)
+
+        nodes.append({
+            'id': i + 1,
+            'label': data.iloc[i]['Mapped Term'],
+            'type': data.iloc[i]['Match Type'].lower(),
+            'score': data.iloc[i]['Similarity Score'],
+            'x': x,
+            'y': y
+        })
+
+        edges.append({'source': 0, 'target': i + 1,
+                      'weight': data.iloc[i]['Similarity Score']})
+
+    return nodes, edges
+
+
+def get_external_resource_links(term, concept_id, source):
+    """Generate links to external terminology resources"""
+    links = {
+        'NCI Thesaurus': f"https://ncithesaurus.nci.nih.gov/ncitbrowser/ConceptReport.jsp?dictionary=NCI_Thesaurus&code={concept_id}",
+        'caDSR': f"https://cadsr.cancer.gov/onedata/dmdirect/NIH/NCI/CO/CDEDD?filter=Conceptual%20Domain%20Public%20ID={concept_id}",
+        'UMLS': f"https://uts.nlm.nih.gov/uts/umls/concept/{concept_id}",
+        'BioPortal': f"https://bioportal.bioontology.org/search?q={term.replace(' ', '+')}",
+        'SNOMED Browser': f"https://browser.ihtsdotools.org/?perspective=full&conceptId1={concept_id}"
+    }
+    return links
+
+
+# Sidebar Configuration
 with st.sidebar:
-    st.markdown("## 🔬 Frederick Platform")
+    st.markdown("## 🔬 Semantic Mapping Platform")
     st.markdown("---")
 
-    page = st.radio(
+    # Navigation
+    page = st.selectbox(
         "Navigation",
-        ["🏠 Dashboard", "💬 AI Chat", "🔗 Graph Visualization", "📊 Metrics", "📁 File Upload"],
-        label_visibility="collapsed"
+        ["🎯 Semantic Mapping", "📊 Results Analysis", "🤖 AI Assistant",
+         "🔗 Graph Visualization", "💬 Feedback Portal", "📈 Analytics Dashboard"]
     )
 
     st.markdown("---")
-    st.markdown("### Quick Stats")
+
+    # Configuration Settings
+    with st.expander("⚙️ Mapping Configuration"):
+        threshold = st.slider("Similarity Threshold", 0.0, 1.0, 0.75, 0.05,
+                              help="Minimum similarity score for matches")
+        max_results = st.number_input("Max Results", 5, 100, 20)
+        terminology_source = st.multiselect(
+            "Terminology Sources",
+            ["SNOMED CT", "ICD-10", "LOINC", "RxNorm", "MedDRA", "NCI Thesaurus"],
+            default=["SNOMED CT", "ICD-10"]
+        )
+        enable_fuzzy = st.checkbox("Enable Fuzzy Matching", value=True)
+        include_synonyms = st.checkbox("Include Synonyms", value=True)
+
+    st.markdown("---")
+
+    # Quick Stats
+    st.markdown("### 📊 Quick Stats")
     col1, col2 = st.columns(2)
     with col1:
-        st.metric("Active Users", "2,847", "12%")
+        st.metric("Mappings Today", "1,247", "↑ 12%")
     with col2:
-        st.metric("Documents", "15.2K", "8%")
+        st.metric("Accuracy", "94.3%", "↑ 2.1%")
 
     st.markdown("---")
-    with st.expander("⚙️ Settings"):
-        theme = st.selectbox("Theme", ["Dark", "Light", "Auto"])
-        notifications = st.checkbox("Enable notifications", value=True)
-        api_endpoint = st.text_input("API Endpoint", "https://api.frederick.ai")
 
-    st.markdown("---")
-    if st.button("📤 Export Data"):
-        st.success("Data export initiated!")
+    # Export Section
+    st.markdown("### 💾 Export Options")
+    export_format = st.selectbox("Format", ["CSV", "TSV", "JSON"])
 
-    st.markdown("---")
-    st.caption("Frederick v2.0.1 | © 2025")
+    if st.button("📥 Export Current Results"):
+        if st.session_state.mapping_results is not None:
+            download_link = export_data(
+                st.session_state.mapping_results,
+                export_format,
+                "semantic_mapping"
+            )
+            st.markdown(download_link, unsafe_allow_html=True)
+            st.success(f"✅ Export ready in {export_format} format")
+        else:
+            st.warning("No results to export")
 
-# Main content area
-if page == "🏠 Dashboard":
-    st.markdown('<h1 class="main-header">Frederick Dashboard</h1>', unsafe_allow_html=True)
+# Main Content Area
+if page == "🎯 Semantic Mapping":
+    st.markdown('<h1 class="main-header">🎯 Semantic Term Mapping</h1>', unsafe_allow_html=True)
 
-    # Metrics row
+    # Input Section
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        query_input = st.text_area(
+            "Enter terms to map (one per line):",
+            placeholder="Enter medical terms, diagnoses, procedures, or medications...\nExample:\nHypertension\nType 2 Diabetes\nAspirin",
+            height=120,
+            value=st.session_state.current_query
+        )
+
+    with col2:
+        st.markdown("### Mapping Options")
+        map_direction = st.radio("Direction", ["Source → Target", "Bidirectional"])
+        batch_mode = st.checkbox("Batch Processing", value=False)
+
+    # Action Buttons
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        st.metric("Total Queries", "45,392", "↑ 15.3%", help="Total queries processed this month")
+        if st.button("🔍 Start Mapping", type="primary", use_container_width=True):
+            if query_input:
+                with st.spinner("Mapping terms..."):
+                    import time
+
+                    time.sleep(1.5)
+
+                    # Generate mock results
+                    terms = query_input.strip().split('\n')
+                    all_results = []
+
+                    for term in terms:
+                        if term.strip():
+                            results = generate_mock_neo4j_data(term.strip(), max_results)
+                            all_results.append(results)
+
+                    if all_results:
+                        st.session_state.mapping_results = pd.concat(all_results, ignore_index=True)
+                        st.session_state.current_query = query_input
+                        st.success(f"✅ Mapped {len(terms)} term(s) successfully!")
+
     with col2:
-        st.metric("Graph Nodes", "8,247", "↑ 523", help="Total nodes in knowledge graph")
+        if st.button("🔄 Clear", use_container_width=True):
+            st.session_state.mapping_results = None
+            st.session_state.current_query = ""
+            st.rerun()
+
     with col3:
-        st.metric("Accuracy", "94.2%", "↑ 2.1%", help="Model accuracy score")
+        if st.button("📋 Load Example", use_container_width=True):
+            st.session_state.current_query = "Hypertension\nDiabetes Mellitus\nCOVID-19"
+            st.rerun()
+
     with col4:
-        st.metric("Response Time", "0.34s", "↓ 0.08s", help="Average response time")
+        if st.button("⚡ Quick Map", use_container_width=True):
+            st.info("Quick mapping uses cached results for faster processing")
 
-    st.markdown("---")
+    # Results Section
+    if st.session_state.mapping_results is not None:
+        st.markdown("---")
+        st.markdown("### 📋 Mapping Results")
 
-    # Charts section
-    col1, col2 = st.columns([2, 1])
+        # Sorting Options
+        col1, col2, col3 = st.columns([2, 2, 3])
+        with col1:
+            sort_by = st.selectbox("Sort by",
+                                   ["Similarity Score", "Match Type", "Mapped Term", "Source"])
+        with col2:
+            sort_order = st.radio("Order", ["Descending", "Ascending"], horizontal=True)
+        with col3:
+            filter_confidence = st.multiselect("Filter by Confidence",
+                                               ["High", "Medium", "Low"], default=["High", "Medium", "Low"])
 
-    with col1:
-        st.subheader("📈 Query Volume Over Time")
-        dates = pd.date_range(start='2025-01-01', periods=30, freq='D')
-        query_data = pd.DataFrame({
-            'Date': dates,
-            'Queries': np.random.randint(1200, 2000, 30) + np.arange(30) * 10,
-            'Successful': np.random.randint(1100, 1900, 30) + np.arange(30) * 9,
-        })
+        # Apply sorting and filtering
+        df = st.session_state.mapping_results.copy()
 
+        if filter_confidence:
+            df = df[df['Confidence'].isin(filter_confidence)]
+
+        ascending = sort_order == "Ascending"
+        if sort_by == "Similarity Score":
+            df = df.sort_values('Similarity Score', ascending=ascending)
+        elif sort_by == "Match Type":
+            df = df.sort_values('Match Type', ascending=ascending)
+        elif sort_by == "Mapped Term":
+            df = df.sort_values('Mapped Term', ascending=ascending)
+        elif sort_by == "Source":
+            df = df.sort_values('Source', ascending=ascending)
+
+        # Display results with annotations
+        st.markdown("#### Detailed Results Table")
+
+        # Create annotated dataframe
+        for idx, row in df.iterrows():
+            with st.expander(f"🔗 {row['Source Term']} → {row['Mapped Term']} (Score: {row['Similarity Score']})"):
+                col1, col2 = st.columns([3, 1])
+
+                with col1:
+                    st.markdown(f"**Match Type:** {row['Match Type']}")
+                    st.markdown(f"**Source:** {row['Source']}")
+                    st.markdown(f"**Concept ID:** {row['Concept ID']}")
+                    st.markdown(f"**Semantic Type:** {row['Semantic Type']}")
+
+                    # External links
+                    links = get_external_resource_links(
+                        row['Mapped Term'], row['Concept ID'], row['Source']
+                    )
+                    st.markdown("**External Resources:**")
+                    link_cols = st.columns(5)
+                    for i, (resource, url) in enumerate(links.items()):
+                        with link_cols[i % 5]:
+                            st.markdown(f"[{resource}]({url})")
+
+                with col2:
+                    # Confidence visualization
+                    score = row['Similarity Score']
+                    color = "#28a745" if score > 0.9 else "#ffc107" if score > 0.75 else "#dc3545"
+                    st.markdown(f"### Confidence")
+                    st.markdown(f"<h2 style='color: {color};'>{row['Confidence']}</h2>",
+                                unsafe_allow_html=True)
+                    st.progress(score)
+
+        # Summary statistics
+        st.markdown("---")
+        st.markdown("#### Summary Statistics")
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric("Total Mappings", len(df))
+        with col2:
+            st.metric("Avg Score", f"{df['Similarity Score'].mean():.3f}")
+        with col3:
+            st.metric("High Confidence", f"{len(df[df['Confidence'] == 'High'])}")
+        with col4:
+            st.metric("Unique Sources", df['Source'].nunique())
+
+        # Save results option
+        st.markdown("---")
+        if st.button("💾 Save Results to Database"):
+            with st.spinner("Saving..."):
+                import time
+
+                time.sleep(1)
+            st.success("✅ Results saved successfully!")
+
+elif page == "📊 Results Analysis":
+    st.markdown('<h1 class="main-header">📊 Results Analysis & Comparison</h1>', unsafe_allow_html=True)
+
+    # Load or generate sample data for analysis
+    if st.session_state.mapping_results is None:
+        st.info("No current results. Loading sample data for demonstration...")
+        st.session_state.mapping_results = generate_mock_neo4j_data("Sample Term", 50)
+
+    df = st.session_state.mapping_results
+
+    # Analysis tabs
+    tab1, tab2, tab3, tab4 = st.tabs(["Distribution", "Comparison", "Trends", "Export"])
+
+    with tab1:
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.subheader("Score Distribution")
+            fig = go.Figure(data=[go.Histogram(
+                x=df['Similarity Score'],
+                nbinsx=20,
+                marker_color='#3498db'
+            )])
+            fig.update_layout(
+                xaxis_title="Similarity Score",
+                yaxis_title="Frequency",
+                height=300
+            )
+            st.plotly_chart(fig, use_container_width=True)
+
+        with col2:
+            st.subheader("Match Type Distribution")
+            match_counts = df['Match Type'].value_counts()
+            fig = go.Figure(data=[go.Pie(
+                labels=match_counts.index,
+                values=match_counts.values,
+                hole=0.4
+            )])
+            fig.update_layout(height=300)
+            st.plotly_chart(fig, use_container_width=True)
+
+    with tab2:
+        st.subheader("Source Comparison")
+        source_stats = df.groupby('Source').agg({
+            'Similarity Score': ['mean', 'std', 'count']
+        }).round(3)
+        st.dataframe(source_stats, use_container_width=True)
+
+    with tab3:
+        st.subheader("Confidence Trends")
+        confidence_data = df.groupby(['Confidence', 'Match Type']).size().reset_index(name='Count')
         fig = go.Figure()
-        fig.add_trace(go.Scatter(x=query_data['Date'], y=query_data['Queries'],
-                                 mode='lines+markers', name='Total Queries',
-                                 line=dict(color='#4fc3f7', width=3)))
-        fig.add_trace(go.Scatter(x=query_data['Date'], y=query_data['Successful'],
-                                 mode='lines+markers', name='Successful',
-                                 line=dict(color='#4caf50', width=2)))
-        fig.update_layout(
-            template='plotly_dark',
-            height=400,
-            hovermode='x unified',
-            showlegend=True,
-            margin=dict(l=0, r=0, t=30, b=0)
-        )
+        for conf in confidence_data['Confidence'].unique():
+            data = confidence_data[confidence_data['Confidence'] == conf]
+            fig.add_trace(go.Bar(name=conf, x=data['Match Type'], y=data['Count']))
+        fig.update_layout(barmode='group', height=400)
         st.plotly_chart(fig, use_container_width=True)
 
-    with col2:
-        st.subheader("🎯 Query Categories")
-        categories = pd.DataFrame({
-            'Category': ['Search', 'Analysis', 'Visualization', 'Export', 'Other'],
-            'Count': [35, 28, 20, 12, 5]
-        })
+    with tab4:
+        st.subheader("Export Analysis Results")
+        col1, col2, col3 = st.columns(3)
 
-        fig = go.Figure(data=[go.Pie(
-            labels=categories['Category'],
-            values=categories['Count'],
-            hole=0.4,
-            marker_colors=['#4fc3f7', '#4caf50', '#ff9800', '#9c27b0', '#607d8b']
-        )])
-        fig.update_layout(
-            template='plotly_dark',
-            height=400,
-            showlegend=True,
-            margin=dict(l=0, r=0, t=30, b=0)
-        )
-        st.plotly_chart(fig, use_container_width=True)
+        with col1:
+            if st.button("📥 Export as CSV"):
+                link = export_data(df, "CSV", "analysis_results")
+                st.markdown(link, unsafe_allow_html=True)
 
-    # Recent Activity
-    st.markdown("---")
-    st.subheader("📋 Recent Activity")
-    activity_data = pd.DataFrame({
-        'Time': pd.date_range(start='2025-01-20 10:00', periods=10, freq='30min'),
-        'User': ['Alice Chen', 'Bob Smith', 'Carol Davis', 'David Lee', 'Emma Wilson',
-                 'Frank Johnson', 'Grace Brown', 'Henry Taylor', 'Iris Martinez', 'Jack Anderson'],
-        'Action': ['Uploaded dataset', 'Ran analysis', 'Created visualization', 'Exported report',
-                   'Updated model', 'Queried database', 'Modified graph', 'Shared dashboard',
-                   'Trained model', 'Reviewed results'],
-        'Status': ['✅ Success', '✅ Success', '⚠️ Warning', '✅ Success', '✅ Success',
-                   '✅ Success', '✅ Success', '✅ Success', '⏳ Processing', '✅ Success']
-    })
-    st.dataframe(activity_data, use_container_width=True, hide_index=True)
+        with col2:
+            if st.button("📥 Export as TSV"):
+                link = export_data(df, "TSV", "analysis_results")
+                st.markdown(link, unsafe_allow_html=True)
 
-elif page == "💬 AI Chat":
-    st.markdown('<h1 class="main-header">RAG AI Assistant</h1>', unsafe_allow_html=True)
+        with col3:
+            if st.button("📥 Export as JSON"):
+                link = export_data(df, "JSON", "analysis_results")
+                st.markdown(link, unsafe_allow_html=True)
 
-    # Chat configuration
+elif page == "🤖 AI Assistant":
+    st.markdown('<h1 class="main-header">🤖 Semantic Mapping AI Assistant</h1>', unsafe_allow_html=True)
+
+    # AI Configuration
     col1, col2, col3 = st.columns([1, 1, 2])
     with col1:
-        model = st.selectbox("Model", ["GPT-4", "Claude-3", "Llama-2", "Custom RAG"])
+        model = st.selectbox("Model", ["GPT-4 Medical", "Claude Medical", "BioGPT"])
     with col2:
-        temperature = st.slider("Temperature", 0.0, 1.0, 0.7)
+        temperature = st.slider("Temperature", 0.0, 1.0, 0.3)
     with col3:
-        context = st.text_input("Context Filter", placeholder="e.g., medical, financial, technical...")
-
-    st.markdown("---")
+        context = st.text_input("Context", placeholder="e.g., oncology, cardiology, pediatrics...")
 
     # Chat interface
-    chat_container = st.container()
-
-    with chat_container:
-        # Display chat history
-        for message in st.session_state.messages:
-            with st.chat_message(message["role"]):
-                st.markdown(message["content"])
+    for message in st.session_state.chat_messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+            if "graph_data" in message:
+                st.plotly_chart(message["graph_data"], use_container_width=True)
 
     # Chat input
-    if prompt := st.chat_input("Ask anything about your knowledge base..."):
-        # Add user message
-        st.session_state.messages.append({"role": "user", "content": prompt})
+    if prompt := st.chat_input("Ask about semantic mappings, terminology, or request Neo4j visualizations..."):
+        st.session_state.chat_messages.append({"role": "user", "content": prompt})
+
         with st.chat_message("user"):
             st.markdown(prompt)
 
-        # Simulate AI response
         with st.chat_message("assistant"):
             with st.spinner("Thinking..."):
                 import time
 
                 time.sleep(1)
 
-                # Mock RAG response
-                response = f"""Based on the knowledge base, here's what I found:
+                # Check if user wants Neo4j data/visualization
+                if any(keyword in prompt.lower() for keyword in ['neo4j', 'graph', 'visualize', 'show connections']):
+                    st.markdown("I'll fetch that data from Neo4j for you...")
 
-**Relevant Documents:** 3 matches found
-- Document A (95% relevance): Contains information about {prompt[:20]}...
-- Document B (87% relevance): Related context on the topic
-- Document C (76% relevance): Supporting information
+                    # Generate mock Neo4j data
+                    neo4j_results = generate_mock_neo4j_data(prompt.split()[-1] if prompt.split() else "Term", 10)
+                    nodes, edges = create_neo4j_visualization(neo4j_results)
 
-**Answer:** 
-This is a simulated response to your query about "{prompt}". In a real implementation, 
-this would retrieve relevant information from your vector database and provide a 
-synthesized answer based on your documents.
+                    # Create visualization
+                    edge_x = []
+                    edge_y = []
+                    for edge in edges:
+                        source = next(n for n in nodes if n['id'] == edge['source'])
+                        target = next(n for n in nodes if n['id'] == edge['target'])
+                        edge_x.extend([source['x'], target['x'], None])
+                        edge_y.extend([source['y'], target['y'], None])
 
-**Confidence Score:** 92%
-**Sources:** [Doc-2847], [Doc-3921], [Doc-1052]"""
+                    edge_trace = go.Scatter(
+                        x=edge_x, y=edge_y,
+                        line=dict(width=1, color='#888'),
+                        hoverinfo='none',
+                        mode='lines'
+                    )
+
+                    node_x = [n['x'] for n in nodes]
+                    node_y = [n['y'] for n in nodes]
+                    node_text = [n['label'] for n in nodes]
+                    node_colors = ['#e74c3c' if n['type'] == 'query' else '#3498db' for n in nodes]
+
+                    node_trace = go.Scatter(
+                        x=node_x, y=node_y,
+                        mode='markers+text',
+                        text=node_text,
+                        textposition="top center",
+                        hoverinfo='text',
+                        marker=dict(
+                            color=node_colors,
+                            size=20,
+                            line_width=2
+                        )
+                    )
+
+                    fig = go.Figure(data=[edge_trace, node_trace],
+                                    layout=go.Layout(
+                                        showlegend=False,
+                                        hovermode='closest',
+                                        margin=dict(b=0, l=0, r=0, t=0),
+                                        xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+                                        yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+                                        height=400
+                                    ))
+
+                    st.plotly_chart(fig, use_container_width=True)
+
+                    # Display tabular results
+                    st.markdown("### Retrieved Neo4j Data:")
+                    st.dataframe(neo4j_results, use_container_width=True)
+
+                    response = f"I've retrieved and visualized the Neo4j data for your query. The graph shows {len(nodes) - 1} connected terms with their relationships and similarity scores."
+
+                else:
+                    response = f"""Based on your query about semantic mapping:
+
+**Analysis:** I understand you're asking about "{prompt}". 
+
+**Relevant Information:**
+- Semantic mapping helps connect different terminology systems
+- Common standards include SNOMED CT, ICD-10, and LOINC
+- Similarity scores above 0.85 are generally considered strong matches
+
+**Recommendations:**
+1. Use fuzzy matching for slight variations
+2. Consider context-specific mappings
+3. Validate results with domain experts
+
+Would you like me to fetch specific Neo4j data or create a visualization?"""
 
                 st.markdown(response)
-                st.session_state.messages.append({"role": "assistant", "content": response})
-
-    # Sidebar with chat options
-    with st.sidebar:
-        st.markdown("### Chat Options")
-        if st.button("🗑️ Clear Chat"):
-            st.session_state.messages = []
-            st.rerun()
-        if st.button("💾 Save Conversation"):
-            st.success("Conversation saved!")
-        if st.button("📥 Load Context"):
-            st.info("Context loaded from knowledge base")
+                st.session_state.chat_messages.append({"role": "assistant", "content": response})
 
 elif page == "🔗 Graph Visualization":
-    st.markdown('<h1 class="main-header">Neo4j Knowledge Graph</h1>', unsafe_allow_html=True)
+    st.markdown('<h1 class="main-header">🔗 Neo4j Graph Visualization</h1>', unsafe_allow_html=True)
 
     # Graph controls
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        node_type = st.selectbox("Node Type", ["All", "Person", "Document", "Concept", "Organization"])
+        graph_type = st.selectbox("Graph Type", ["Terminology Network", "Concept Hierarchy", "Mapping Relations"])
     with col2:
-        depth = st.slider("Depth", 1, 5, 2)
+        layout_type = st.selectbox("Layout", ["Force-Directed", "Hierarchical", "Circular"])
     with col3:
-        layout = st.selectbox("Layout", ["Force-directed", "Circular", "Hierarchical", "Random"])
+        depth = st.slider("Depth", 1, 5, 2)
     with col4:
-        max_nodes = st.number_input("Max Nodes", 10, 500, 100)
+        max_nodes_viz = st.number_input("Max Nodes", 10, 100, 30)
 
-    # Search bar
-    search = st.text_input("🔍 Search nodes...", placeholder="Enter node name or property...")
+    # Query builder
+    cypher_query = st.text_area(
+        "Cypher Query:",
+        value="MATCH (n:Term)-[r:MAPS_TO]->(m:Term) WHERE r.score > 0.75 RETURN n, r, m LIMIT 25",
+        height=80
+    )
 
-    st.markdown("---")
+    if st.button("🔍 Execute Query & Visualize"):
+        with st.spinner("Fetching from Neo4j..."):
+            import time
 
-    # Create sample graph
-    if st.button("🔄 Generate Graph") or st.session_state.graph_data is None:
-        # Create a sample graph without networkx
-        num_nodes = min(max_nodes, 50)
+            time.sleep(1.5)
 
-        # Generate node positions based on layout
-        node_x = []
-        node_y = []
+            st.success("✅ Query executed successfully")
 
-        if layout == "Circular":
-            # Circular layout
-            for i in range(num_nodes):
-                angle = 2 * math.pi * i / num_nodes
-                node_x.append(math.cos(angle))
-                node_y.append(math.sin(angle))
-        elif layout == "Hierarchical":
-            # Simple hierarchical layout
-            levels = 4
-            nodes_per_level = num_nodes // levels
-            for i in range(num_nodes):
-                level = i // nodes_per_level
-                pos_in_level = i % nodes_per_level
-                node_x.append(pos_in_level * 2.0 / nodes_per_level - 1)
-                node_y.append(1 - level * 2.0 / levels)
-        elif layout == "Force-directed":
-            # Simulated force-directed layout (simplified)
-            np.random.seed(42)
-            node_x = np.random.randn(num_nodes) * 2
-            node_y = np.random.randn(num_nodes) * 2
-            # Simple spreading
-            for _ in range(10):
-                for i in range(num_nodes):
-                    for j in range(i + 1, num_nodes):
-                        dx = node_x[i] - node_x[j]
-                        dy = node_y[i] - node_y[j]
-                        dist = math.sqrt(dx * dx + dy * dy) + 0.01
-                        if dist < 1:
-                            force = (1 - dist) * 0.05
-                            node_x[i] += dx / dist * force
-                            node_y[i] += dy / dist * force
-                            node_x[j] -= dx / dist * force
-                            node_y[j] -= dy / dist * force
-        else:  # Random
-            node_x = np.random.randn(num_nodes)
-            node_y = np.random.randn(num_nodes)
+            # Generate sample data for visualization
+            sample_data = generate_mock_neo4j_data("Query Term", 15)
+            nodes, edges = create_neo4j_visualization(sample_data)
 
-        # Create edges (random connections)
-        edges = []
-        edge_x = []
-        edge_y = []
+            # Create visualization
+            edge_x = []
+            edge_y = []
+            for edge in edges:
+                source = next(n for n in nodes if n['id'] == edge['source'])
+                target = next(n for n in nodes if n['id'] == edge['target'])
+                edge_x.extend([source['x'], target['x'], None])
+                edge_y.extend([source['y'], target['y'], None])
 
-        # Generate random edges
-        for i in range(num_nodes):
-            # Each node connects to 1-4 other nodes
-            num_connections = random.randint(1, min(4, num_nodes - 1))
-            for _ in range(num_connections):
-                j = random.randint(0, num_nodes - 1)
-                if i != j and (i, j) not in edges and (j, i) not in edges:
-                    edges.append((i, j))
-                    edge_x.extend([node_x[i], node_x[j], None])
-                    edge_y.extend([node_y[i], node_y[j], None])
+            edge_trace = go.Scatter(
+                x=edge_x, y=edge_y,
+                line=dict(width=1, color='#888'),
+                hoverinfo='none',
+                mode='lines'
+            )
 
-        # Create edge trace
-        edge_trace = go.Scatter(
-            x=edge_x, y=edge_y,
-            line=dict(width=0.5, color='rgba(125, 125, 125, 0.5)'),
-            hoverinfo='none',
-            mode='lines')
+            node_x = [n['x'] for n in nodes]
+            node_y = [n['y'] for n in nodes]
+            node_text = [n['label'] for n in nodes]
+            node_colors = ['#e74c3c' if n['type'] == 'query' else '#3498db' for n in nodes]
 
-        # Create node trace
-        node_text = []
-        node_color = []
+            node_trace = go.Scatter(
+                x=node_x, y=node_y,
+                mode='markers+text',
+                text=node_text,
+                textposition="top center",
+                hoverinfo='text',
+                marker=dict(
+                    color=node_colors,
+                    size=20,
+                    line_width=2
+                )
+            )
 
-        node_types = ['Person', 'Document', 'Concept', 'Organization']
-        type_colors = {'Person': '#4fc3f7', 'Document': '#4caf50',
-                       'Concept': '#ff9800', 'Organization': '#9c27b0'}
+            fig = go.Figure(data=[edge_trace, node_trace],
+                            layout=go.Layout(
+                                showlegend=False,
+                                hovermode='closest',
+                                margin=dict(b=0, l=0, r=0, t=0),
+                                xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+                                yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+                                height=500
+                            ))
 
-        for i in range(num_nodes):
-            n_type = random.choice(node_types)
-            node_text.append(f"{n_type}_{i}")
-            node_color.append(type_colors[n_type])
-
-        node_trace = go.Scatter(
-            x=node_x, y=node_y,
-            mode='markers+text',
-            hoverinfo='text',
-            text=node_text,
-            textposition="top center",
-            marker=dict(
-                showscale=False,
-                color=node_color,
-                size=15,
-                line_width=2))
-
-        # Create figure
-        fig = go.Figure(data=[edge_trace, node_trace],
-                        layout=go.Layout(
-                            showlegend=False,
-                            hovermode='closest',
-                            margin=dict(b=0, l=0, r=0, t=0),
-                            xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
-                            yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
-                            template='plotly_dark',
-                            height=600,
-                            paper_bgcolor='rgba(0,0,0,0)',
-                            plot_bgcolor='rgba(0,0,0,0)'
-                        ))
-
-        st.plotly_chart(fig, use_container_width=True)
-        st.session_state.graph_data = fig
-    else:
-        st.plotly_chart(st.session_state.graph_data, use_container_width=True)
+            st.plotly_chart(fig, use_container_width=True)
 
     # Graph statistics
     st.markdown("---")
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        st.metric("Nodes", f"{random.randint(80, 120)}")
+        st.metric("Nodes", "2,847")
     with col2:
-        st.metric("Edges", f"{random.randint(150, 250)}")
+        st.metric("Relationships", "15,394")
     with col3:
-        st.metric("Clusters", f"{random.randint(3, 7)}")
+        st.metric("Avg Degree", "5.4")
     with col4:
-        st.metric("Density", f"{random.uniform(0.3, 0.7):.3f}")
+        st.metric("Clusters", "12")
 
-    # Query builder
-    with st.expander("🔧 Cypher Query Builder"):
-        query = st.text_area("Enter Cypher Query",
-                             value="MATCH (n)-[r]->(m) RETURN n, r, m LIMIT 25",
-                             height=100)
-        col1, col2 = st.columns([1, 4])
+elif page == "💬 Feedback Portal":
+    st.markdown('<h1 class="main-header">💬 Expert Feedback Portal</h1>', unsafe_allow_html=True)
+
+    st.markdown("""
+    Your feedback helps us improve our semantic mapping accuracy and coverage. 
+    Please share your expertise to enhance our system for all users.
+    """)
+
+    # Feedback form
+    with st.form("feedback_form"):
+        st.markdown("### Submit Feedback")
+
+        col1, col2 = st.columns(2)
+
         with col1:
-            if st.button("▶️ Execute"):
-                st.success("Query executed successfully!")
+            name = st.text_input("Name (Optional)", placeholder="Dr. Jane Smith")
+            email = st.text_input("Email*", placeholder="doctor@hospital.org")
+            organization = st.text_input("Organization", placeholder="Mayo Clinic")
+            specialty = st.selectbox("Specialty",
+                                     ["General Practice", "Cardiology", "Oncology", "Neurology",
+                                      "Pediatrics", "Radiology", "Other"])
+
         with col2:
-            if st.button("📋 Copy"):
-                st.info("Query copied to clipboard!")
+            feedback_type = st.selectbox("Feedback Type",
+                                         ["Incorrect Mapping", "Missing Term", "Suggestion",
+                                          "Bug Report", "Feature Request", "General Feedback"])
+            priority = st.select_slider("Priority",
+                                        ["Low", "Medium", "High", "Critical"])
+            affected_terms = st.text_area("Affected Terms",
+                                          placeholder="List the terms involved...")
 
-elif page == "📊 Metrics":
-    st.markdown('<h1 class="main-header">Performance Metrics</h1>', unsafe_allow_html=True)
+        feedback_text = st.text_area("Detailed Feedback*",
+                                     placeholder="Please describe the issue or suggestion in detail...",
+                                     height=150)
 
-    # Time range selector
-    col1, col2 = st.columns([3, 1])
-    with col1:
-        date_range = st.date_input("Select Date Range",
-                                   value=(datetime.now() - timedelta(days=30), datetime.now()),
-                                   format="YYYY-MM-DD")
-    with col2:
-        refresh = st.button("🔄 Refresh Metrics")
+        # Attachment option
+        attachments = st.file_uploader("Attach Supporting Documents (Optional)",
+                                       type=['pdf', 'docx', 'txt', 'csv'],
+                                       accept_multiple_files=True)
 
+        col1, col2 = st.columns([1, 3])
+        with col1:
+            submitted = st.form_submit_button("📤 Submit Feedback", type="primary")
+        with col2:
+            if submitted:
+                if email and feedback_text:
+                    # Store feedback
+                    feedback_entry = {
+                        'timestamp': datetime.now(),
+                        'name': name or "Anonymous",
+                        'email': email,
+                        'organization': organization,
+                        'specialty': specialty,
+                        'type': feedback_type,
+                        'priority': priority,
+                        'feedback': feedback_text,
+                        'attachments': len(attachments) if attachments else 0
+                    }
+                    st.session_state.feedback_history.append(feedback_entry)
+
+                    st.success("✅ Thank you for your feedback! We'll review it within 24-48 hours.")
+                    st.balloons()
+                else:
+                    st.error("Please fill in required fields (Email and Feedback)")
+
+    # Previous feedback
     st.markdown("---")
+    st.markdown("### Recent Feedback Submissions")
 
-    # KPI Cards
+    if st.session_state.feedback_history:
+        feedback_df = pd.DataFrame(st.session_state.feedback_history)
+
+        # Display recent feedback
+        for idx, feedback in enumerate(reversed(st.session_state.feedback_history[-5:])):
+            with st.expander(
+                    f"📝 {feedback['type']} - {feedback['timestamp'].strftime('%Y-%m-%d %H:%M')} - Priority: {feedback['priority']}"):
+                col1, col2 = st.columns([2, 1])
+                with col1:
+                    st.markdown(f"**From:** {feedback['name']} ({feedback['organization']})")
+                    st.markdown(f"**Specialty:** {feedback['specialty']}")
+                    st.markdown(f"**Feedback:** {feedback['feedback']}")
+                with col2:
+                    st.markdown(f"**Status:** 🔄 Under Review")
+                    if feedback['attachments'] > 0:
+                        st.markdown(f"📎 {feedback['attachments']} attachment(s)")
+    else:
+        st.info("No feedback submissions yet")
+
+    # Feedback statistics
+    st.markdown("---")
+    st.markdown("### Feedback Statistics")
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        st.metric("Avg Response Time", "0.34s", "-12%", help="Average query response time")
+        st.metric("Total Submissions", len(st.session_state.feedback_history))
     with col2:
-        st.metric("Success Rate", "94.2%", "+2.1%", help="Percentage of successful queries")
+        critical_count = sum(1 for f in st.session_state.feedback_history if f.get('priority') == 'Critical')
+        st.metric("Critical Issues", critical_count)
     with col3:
-        st.metric("Active Sessions", "127", "+15", help="Current active user sessions")
+        st.metric("Avg Response Time", "18 hours")
     with col4:
-        st.metric("Error Rate", "0.8%", "-0.3%", help="Percentage of failed requests")
+        st.metric("Resolution Rate", "92%")
+
+elif page == "📈 Analytics Dashboard":
+    st.markdown('<h1 class="main-header">📈 Analytics Dashboard</h1>', unsafe_allow_html=True)
+
+    # Date range selector
+    col1, col2, col3 = st.columns([2, 2, 1])
+    with col1:
+        start_date = st.date_input("Start Date", datetime.now() - timedelta(days=30))
+    with col2:
+        end_date = st.date_input("End Date", datetime.now())
+    with col3:
+        if st.button("🔄 Refresh", use_container_width=True):
+            st.rerun()
+
+    # Key metrics
+    st.markdown("### Key Performance Indicators")
+    col1, col2, col3, col4 = st.columns(4)
+
+    with col1:
+        st.markdown('<div class="metric-box">', unsafe_allow_html=True)
+        st.metric("Total Mappings", "45,892", "↑ 15.3%",
+                  help="Total semantic mappings performed")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    with col2:
+        st.markdown('<div class="metric-box">', unsafe_allow_html=True)
+        st.metric("Accuracy Rate", "94.3%", "↑ 2.1%",
+                  help="Percentage of validated correct mappings")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    with col3:
+        st.markdown('<div class="metric-box">', unsafe_allow_html=True)
+        st.metric("Avg Response Time", "0.34s", "↓ 0.12s",
+                  help="Average mapping query response time")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    with col4:
+        st.markdown('<div class="metric-box">', unsafe_allow_html=True)
+        st.metric("Active Users", "287", "↑ 24",
+                  help="Unique users in the last 24 hours")
+        st.markdown('</div>', unsafe_allow_html=True)
 
     st.markdown("---")
 
-    # Detailed metrics
-    tab1, tab2, tab3, tab4 = st.tabs(["Performance", "Usage", "Errors", "Resources"])
+    # Analytics tabs
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(["Usage Trends", "Mapping Quality", "Term Coverage",
+                                            "User Activity", "System Performance"])
 
     with tab1:
+        st.subheader("Mapping Volume Over Time")
+
+        # Generate time series data
+        dates = pd.date_range(start=start_date, end=end_date, freq='D')
+        volume_data = pd.DataFrame({
+            'Date': dates,
+            'Successful Mappings': np.random.randint(800, 1500, len(dates)) + np.arange(len(dates)) * 5,
+            'Failed Mappings': np.random.randint(50, 150, len(dates)),
+            'Partial Mappings': np.random.randint(100, 300, len(dates))
+        })
+
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(x=volume_data['Date'], y=volume_data['Successful Mappings'],
+                                 mode='lines', name='Successful', line=dict(color='#28a745', width=3)))
+        fig.add_trace(go.Scatter(x=volume_data['Date'], y=volume_data['Partial Mappings'],
+                                 mode='lines', name='Partial', line=dict(color='#ffc107', width=2)))
+        fig.add_trace(go.Scatter(x=volume_data['Date'], y=volume_data['Failed Mappings'],
+                                 mode='lines', name='Failed', line=dict(color='#dc3545', width=2)))
+        fig.update_layout(height=400, hovermode='x unified')
+        st.plotly_chart(fig, use_container_width=True)
+
+        # Top mapped terms
         col1, col2 = st.columns(2)
         with col1:
-            st.subheader("Response Time Distribution")
-            response_times = np.random.lognormal(0, 0.5, 1000)
-            fig = go.Figure(data=[go.Histogram(x=response_times, nbinsx=30,
-                                               marker_color='#4fc3f7')])
-            fig.update_layout(template='plotly_dark', height=300,
-                              xaxis_title="Response Time (s)",
-                              yaxis_title="Frequency")
-            st.plotly_chart(fig, use_container_width=True)
+            st.subheader("Top Mapped Terms")
+            top_terms = pd.DataFrame({
+                'Term': ['Hypertension', 'Diabetes Type 2', 'COVID-19', 'Pneumonia', 'Asthma'],
+                'Count': [2847, 2103, 1876, 1654, 1432]
+            })
+            st.dataframe(top_terms, use_container_width=True, hide_index=True)
 
         with col2:
-            st.subheader("Throughput Over Time")
-            hours = list(range(24))
-            throughput = [random.randint(800, 1200) + i * 10 for i in hours]
-            fig = go.Figure(data=[go.Bar(x=hours, y=throughput,
-                                         marker_color='#4caf50')])
-            fig.update_layout(template='plotly_dark', height=300,
-                              xaxis_title="Hour of Day",
-                              yaxis_title="Requests/Hour")
+            st.subheader("Mapping Sources Distribution")
+            sources = pd.DataFrame({
+                'Source': ['SNOMED CT', 'ICD-10', 'LOINC', 'RxNorm', 'MedDRA'],
+                'Percentage': [35, 28, 20, 12, 5]
+            })
+            fig = go.Figure(data=[go.Pie(labels=sources['Source'], values=sources['Percentage'], hole=0.4)])
+            fig.update_layout(height=300)
             st.plotly_chart(fig, use_container_width=True)
 
     with tab2:
-        st.subheader("API Usage Statistics")
-        endpoints = pd.DataFrame({
-            'Endpoint': ['/search', '/analyze', '/graph', '/upload', '/export'],
-            'Calls': [15234, 8921, 6547, 3210, 1876],
-            'Avg Time (ms)': [234, 567, 890, 123, 456],
-            'Success Rate': ['99.2%', '97.8%', '95.3%', '99.9%', '98.1%']
+        st.subheader("Mapping Quality Metrics")
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            # Score distribution
+            st.markdown("#### Similarity Score Distribution")
+            scores = np.random.beta(8, 2, 1000)  # Skewed towards higher scores
+            fig = go.Figure(data=[go.Histogram(x=scores, nbinsx=30, marker_color='#3498db')])
+            fig.update_layout(
+                xaxis_title="Similarity Score",
+                yaxis_title="Frequency",
+                height=350
+            )
+            st.plotly_chart(fig, use_container_width=True)
+
+        with col2:
+            # Confidence levels over time
+            st.markdown("#### Confidence Levels Trend")
+            dates_weekly = pd.date_range(start=start_date, end=end_date, freq='W')
+            confidence_data = pd.DataFrame({
+                'Date': dates_weekly,
+                'High': np.random.randint(60, 70, len(dates_weekly)),
+                'Medium': np.random.randint(20, 30, len(dates_weekly)),
+                'Low': np.random.randint(5, 15, len(dates_weekly))
+            })
+
+            fig = go.Figure()
+            fig.add_trace(go.Bar(x=confidence_data['Date'], y=confidence_data['High'],
+                                 name='High', marker_color='#28a745'))
+            fig.add_trace(go.Bar(x=confidence_data['Date'], y=confidence_data['Medium'],
+                                 name='Medium', marker_color='#ffc107'))
+            fig.add_trace(go.Bar(x=confidence_data['Date'], y=confidence_data['Low'],
+                                 name='Low', marker_color='#dc3545'))
+            fig.update_layout(barmode='stack', height=350)
+            st.plotly_chart(fig, use_container_width=True)
+
+        # Quality indicators
+        st.markdown("#### Quality Indicators")
+        quality_metrics = pd.DataFrame({
+            'Metric': ['Precision', 'Recall', 'F1-Score', 'Coverage', 'Consistency'],
+            'Value': [0.943, 0.912, 0.927, 0.856, 0.974],
+            'Target': [0.95, 0.90, 0.92, 0.85, 0.97],
+            'Status': ['🟡', '✅', '✅', '✅', '✅']
         })
-        st.dataframe(endpoints, use_container_width=True, hide_index=True)
+        st.dataframe(quality_metrics, use_container_width=True, hide_index=True)
 
     with tab3:
-        st.subheader("Error Analysis")
-        error_types = pd.DataFrame({
-            'Error Type': ['Timeout', 'Bad Request', 'Server Error', 'Not Found', 'Auth Failed'],
-            'Count': [45, 123, 12, 67, 23],
-            'Percentage': ['16.7%', '45.6%', '4.4%', '24.8%', '8.5%']
-        })
+        st.subheader("Terminology Coverage Analysis")
 
-        col1, col2 = st.columns([2, 1])
-        with col1:
-            st.dataframe(error_types, use_container_width=True, hide_index=True)
-        with col2:
-            fig = go.Figure(data=[go.Pie(labels=error_types['Error Type'],
-                                         values=error_types['Count'],
-                                         hole=0.4)])
-            fig.update_layout(template='plotly_dark', height=250, showlegend=False)
-            st.plotly_chart(fig, use_container_width=True)
+        # Coverage by domain
+        domains = ['Cardiology', 'Oncology', 'Neurology', 'Pediatrics', 'Radiology',
+                   'Endocrinology', 'Infectious Disease', 'Psychiatry']
+        coverage = [92, 88, 85, 90, 78, 83, 95, 72]
+
+        fig = go.Figure(data=[go.Bar(
+            x=coverage,
+            y=domains,
+            orientation='h',
+            marker=dict(
+                color=coverage,
+                colorscale='Viridis',
+                showscale=True,
+                colorbar=dict(title="Coverage %")
+            )
+        )])
+        fig.update_layout(
+            xaxis_title="Coverage Percentage",
+            height=400
+        )
+        st.plotly_chart(fig, use_container_width=True)
+
+        # Gap analysis
+        st.markdown("#### Identified Gaps")
+        gaps_data = pd.DataFrame({
+            'Domain': ['Rare Diseases', 'Genomics', 'Traditional Medicine', 'Veterinary'],
+            'Missing Terms': [342, 278, 456, 189],
+            'Priority': ['High', 'Medium', 'Low', 'Low'],
+            'Est. Completion': ['Q2 2025', 'Q3 2025', 'Q4 2025', 'Q1 2026']
+        })
+        st.dataframe(gaps_data, use_container_width=True, hide_index=True)
 
     with tab4:
-        st.subheader("System Resources")
+        st.subheader("User Activity Analysis")
+
         col1, col2 = st.columns(2)
+
         with col1:
-            cpu_usage = [random.randint(40, 80) for _ in range(60)]
-            fig = go.Figure(data=[go.Scatter(y=cpu_usage, mode='lines',
-                                             line=dict(color='#ff9800', width=2))])
-            fig.update_layout(template='plotly_dark', height=250,
-                              title="CPU Usage (%)", showlegend=False)
-            st.plotly_chart(fig, use_container_width=True)
-
-        with col2:
-            memory_usage = [random.randint(50, 70) for _ in range(60)]
-            fig = go.Figure(data=[go.Scatter(y=memory_usage, mode='lines',
-                                             line=dict(color='#9c27b0', width=2))])
-            fig.update_layout(template='plotly_dark', height=250,
-                              title="Memory Usage (%)", showlegend=False)
-            st.plotly_chart(fig, use_container_width=True)
-
-elif page == "📁 File Upload":
-    st.markdown('<h1 class="main-header">Model Training Data Upload</h1>', unsafe_allow_html=True)
-
-    # Upload configuration
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        upload_type = st.selectbox("Upload Type",
-                                   ["Training Data", "Validation Data", "Test Data", "Knowledge Base"])
-    with col2:
-        model_version = st.selectbox("Target Model",
-                                     ["RAG Model v2.0", "Classification v1.5", "NER v3.0", "Custom"])
-    with col3:
-        preprocessing = st.selectbox("Preprocessing",
-                                     ["Auto-detect", "Text Cleaning", "Tokenization", "None"])
-
-    st.markdown("---")
-
-    # File upload area
-    uploaded_files = st.file_uploader(
-        "Choose files for model training",
-        type=['csv', 'json', 'txt', 'pdf', 'xlsx'],
-        accept_multiple_files=True,
-        help="Upload your training data files. Supported formats: CSV, JSON, TXT, PDF, XLSX"
-    )
-
-    if uploaded_files:
-        st.success(f"✅ {len(uploaded_files)} file(s) uploaded successfully!")
-
-        # File details
-        st.subheader("📋 Uploaded Files")
-        file_data = []
-        for file in uploaded_files:
-            file_data.append({
-                'File Name': file.name,
-                'Type': file.type,
-                'Size': f"{file.size / 1024:.2f} KB",
-                'Status': '✅ Ready'
+            # User distribution by role
+            st.markdown("#### Users by Role")
+            roles = pd.DataFrame({
+                'Role': ['Physicians', 'Researchers', 'Data Scientists', 'Administrators', 'Other'],
+                'Count': [124, 89, 56, 12, 6]
             })
-            st.session_state.uploaded_files.append(file)
-
-        df = pd.DataFrame(file_data)
-        st.dataframe(df, use_container_width=True, hide_index=True)
-
-        # Processing options
-        st.markdown("---")
-        st.subheader("⚙️ Processing Options")
-
-        col1, col2 = st.columns(2)
-        with col1:
-            batch_size = st.number_input("Batch Size", 16, 256, 32)
-            validation_split = st.slider("Validation Split", 0.1, 0.3, 0.2)
-            shuffle = st.checkbox("Shuffle Data", value=True)
-
-        with col2:
-            augmentation = st.checkbox("Data Augmentation", value=False)
-            normalize = st.checkbox("Normalize Features", value=True)
-            remove_duplicates = st.checkbox("Remove Duplicates", value=True)
-
-        # Advanced settings
-        with st.expander("🔧 Advanced Settings"):
-            col1, col2 = st.columns(2)
-            with col1:
-                encoding = st.selectbox("Text Encoding", ["UTF-8", "ASCII", "Latin-1"])
-                delimiter = st.selectbox("CSV Delimiter", [",", ";", "\t", "|"])
-            with col2:
-                max_features = st.number_input("Max Features", 100, 10000, 1000)
-                min_samples = st.number_input("Min Samples per Class", 1, 100, 10)
-
-        # Action buttons
-        st.markdown("---")
-        col1, col2, col3, col4 = st.columns(4)
-        with col1:
-            if st.button("▶️ Start Training", type="primary"):
-                with st.spinner("Processing files and starting training..."):
-                    import time
-
-                    time.sleep(2)
-                st.success("🚀 Training job initiated! Job ID: TRN-2025-0847")
-        with col2:
-            if st.button("📊 Validate Data"):
-                st.info("Data validation in progress...")
-        with col3:
-            if st.button("👁️ Preview Data"):
-                st.info("Loading data preview...")
-        with col4:
-            if st.button("🗑️ Clear All"):
-                st.session_state.uploaded_files = []
-                st.rerun()
-
-    else:
-        # Drag and drop area
-        st.info("📤 Drag and drop files here or click to browse")
-
-    # Recent uploads
-    st.markdown("---")
-    st.subheader("📜 Recent Training Jobs")
-
-    jobs_data = pd.DataFrame({
-        'Job ID': ['TRN-2025-0846', 'TRN-2025-0845', 'TRN-2025-0844', 'TRN-2025-0843'],
-        'Model': ['RAG Model v2.0', 'Classification v1.5', 'NER v3.0', 'RAG Model v1.9'],
-        'Files': [12, 8, 15, 10],
-        'Status': ['🟢 Completed', '🔵 Running', '🟢 Completed', '🔴 Failed'],
-        'Accuracy': ['94.2%', 'Processing...', '91.8%', 'N/A'],
-        'Duration': ['2h 15m', '1h 30m', '3h 45m', '0h 45m']
-    })
-
-    st.dataframe(jobs_data, use_container_width=True, hide_index=True)
-
-    # Training metrics visualization
-    if st.checkbox("Show Training Metrics"):
-        col1, col2 = st.columns(2)
-        with col1:
-            epochs = list(range(1, 21))
-            loss = [3.5 - i * 0.15 + random.uniform(-0.1, 0.1) for i in epochs]
-            fig = go.Figure(data=[go.Scatter(x=epochs, y=loss, mode='lines+markers',
-                                             line=dict(color='#ff5252', width=2))])
-            fig.update_layout(template='plotly_dark', height=300,
-                              title="Training Loss", xaxis_title="Epoch", yaxis_title="Loss")
+            fig = go.Figure(data=[go.Pie(labels=roles['Role'], values=roles['Count'])])
+            fig.update_layout(height=300)
             st.plotly_chart(fig, use_container_width=True)
 
         with col2:
-            accuracy = [0.5 + i * 0.02 + random.uniform(-0.01, 0.01) for i in epochs]
-            fig = go.Figure(data=[go.Scatter(x=epochs, y=accuracy, mode='lines+markers',
-                                             line=dict(color='#4caf50', width=2))])
-            fig.update_layout(template='plotly_dark', height=300,
-                              title="Validation Accuracy", xaxis_title="Epoch", yaxis_title="Accuracy")
+            # Activity heatmap (simplified)
+            st.markdown("#### Activity Heatmap")
+            hours = list(range(24))
+            activity = [random.randint(10, 100) for _ in hours]
+            fig = go.Figure(data=[go.Bar(x=hours, y=activity, marker_color=activity,
+                                         marker_colorscale='Reds')])
+            fig.update_layout(
+                xaxis_title="Hour of Day",
+                yaxis_title="Activity Level",
+                height=300
+            )
             st.plotly_chart(fig, use_container_width=True)
 
-# Footer
+        # Top users
+        st.markdown("#### Most Active Users")
+        top_users = pd.DataFrame({
+            'User': ['Dr. Smith', 'Dr. Johnson', 'Dr. Williams', 'Dr. Brown', 'Dr. Davis'],
+            'Organization': ['Mayo Clinic', 'Johns Hopkins', 'Cleveland Clinic', 'UCSF', 'Mount Sinai'],
+            'Mappings': [342, 298, 276, 245, 198],
+            'Accuracy': ['96.2%', '94.8%', '97.1%', '93.5%', '95.9%']
+        })
+        st.dataframe(top_users, use_container_width=True, hide_index=True)
+
+    with tab5:
+        st.subheader("System Performance Metrics")
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            # Response time
+            st.markdown("#### Response Time (ms)")
+            response_times = np.random.lognormal(5.5, 0.5, 100)
+            fig = go.Figure(data=[go.Box(y=response_times, marker_color='#3498db')])
+            fig.update_layout(yaxis_title="Response Time (ms)", height=350)
+            st.plotly_chart(fig, use_container_width=True)
+
+        with col2:
+            # System load
+            st.markdown("#### System Load")
+            hours = list(range(24))
+            cpu = [random.randint(30, 80) for _ in hours]
+            memory = [random.randint(40, 70) for _ in hours]
+
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(x=hours, y=cpu, mode='lines', name='CPU %',
+                                     line=dict(color='#e74c3c', width=2)))
+            fig.add_trace(go.Scatter(x=hours, y=memory, mode='lines', name='Memory %',
+                                     line=dict(color='#3498db', width=2)))
+            fig.update_layout(
+                xaxis_title="Hour",
+                yaxis_title="Usage %",
+                height=350
+            )
+            st.plotly_chart(fig, use_container_width=True)
+
+        # Error logs
+        st.markdown("#### Recent System Events")
+        events = pd.DataFrame({
+            'Time': pd.date_range(end=datetime.now(), periods=5, freq='H'),
+            'Event': ['Mapping service scaled up', 'Cache cleared', 'Database backup completed',
+                      'API rate limit adjusted', 'Model updated to v2.3'],
+            'Type': ['Info', 'Info', 'Success', 'Warning', 'Success'],
+            'Impact': ['None', 'None', 'None', 'Minor', 'None']
+        })
+        st.dataframe(events, use_container_width=True, hide_index=True)
+
+# Footer with export summary
 st.markdown("---")
 st.markdown(
     """
-    <div style='text-align: center; color: #888; padding: 1rem;'>
-        <small>Frederick Platform v2.0.1 | Powered by RAG & Neo4j | © 2025 Frederick AI</small>
+    <div style='text-align: center; padding: 2rem; background: rgba(255, 255, 255, 0.05); border-radius: 8px; margin-top: 2rem; border: 1px solid rgba(255, 255, 255, 0.1);'>
+        <h4 style='color: #4fc3f7;'>Frederick Semantic Mapping Platform v2.0</h4>
+        <p style='color: rgba(255, 255, 255, 0.8);'>Powered by Neo4j Graph Database | AI-Enhanced Terminology Mapping</p>
+        <small style='color: rgba(255, 255, 255, 0.6);'>© 2025 Frederick Platform | Support: support@frederick.ai | Documentation: docs.frederick.ai</small>
     </div>
     """,
     unsafe_allow_html=True
