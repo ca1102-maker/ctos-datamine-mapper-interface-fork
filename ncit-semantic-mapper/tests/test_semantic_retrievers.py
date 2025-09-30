@@ -8,7 +8,7 @@ or NCIT (NCI Thesaurus) term searches.
 """
 
 import sys
-from semantic_retrievers import SemanticSearcher
+from core_tools.semantic_retrievers import SemanticSearcher
 
 def print_separator():
     """Print a visual separator line"""

@@ -4,7 +4,7 @@ Fetches exact matches for any term, code, label or concept
 """
 from neo4j import GraphDatabase
 import os
-from ..config import Config
+from .config import Config
 
 class get_node_match:
     """

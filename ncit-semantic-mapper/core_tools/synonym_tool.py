@@ -4,7 +4,7 @@ Fetches all synonym data for a given term, code or permissible value
 """
 
 import os
-from ..config import Config
+from .config import Config
 from neo4j import GraphDatabase
 
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from exact_match import get_node_match
+from core_tools.exact_match import get_node_match
 import sys
 import os
 
