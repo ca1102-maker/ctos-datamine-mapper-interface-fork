@@ -1,12 +1,15 @@
 import os
 import openai
+from .config import Config
 from neo4j import GraphDatabase
-#from dotenv import load_dotenv
 
-#load_dotenv()
 
 class SemanticSearcher:
-    def __init__(self):
+
+    def __init__(self, uri = Config.NEO4J_URI,
+                 username = Config.NEO4J_USERNAME,
+                 password = Config.NEO4J_PASSWORD,
+                 api_key = Config.OPENAI_API_KEY):
         # Initialize OpenAI client
         self.openai_client = openai.OpenAI(
             api_key=os.getenv('OPENAI_API_KEY')

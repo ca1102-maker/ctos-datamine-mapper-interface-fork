@@ -3,7 +3,7 @@
 Test script for the synonym finder
 Allows user to choose between searching by PV term or NCIT code
 """
-from synonym_tool import get_synonyms  
+from core_tools.synonym_tool import get_synonyms  
 import sys
 import os
 
