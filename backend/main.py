@@ -56,7 +56,7 @@ def synonym_by_term(query: TermQuery):
 @app.post("semantic/by_code")
 def semantic_by_code(query: CodeQuery):
     searcher = SemanticSearcher()
-    result = searcher.semantic_pv_search(query.term)
+    result = searcher.semantic_pv_search(query.code)
     if not result:
         raise HTTPException(status_code=404, detail="No semantic PV matches found")
     return result
