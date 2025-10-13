@@ -22,8 +22,7 @@ def create_fresh_agent():
     
     Config.validate()
     
-    # Initialize LLM to use a local Ollama model
-    llm = OllamaLLM(model="llama3.1") # <-- MODIFIED: Instantiated local llama3.1 model
+    llm = OllamaLLM(model="llama3.1") 
     
     # adding tools
     tools = [
