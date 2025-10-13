@@ -31,7 +31,7 @@ class get_node_match:
         RETURN n.term as term, 
                n.definition as definition, 
                n.type as type, 
-               n.openai_embedding as embedding
+               n.nomic_embedding as embedding
         """
         
         print(f"Finding exact match for code: {code}")
@@ -81,7 +81,7 @@ class get_node_match:
                n.term as term, 
                n.definition as definition, 
                n.type as type, 
-               n.openai_embedding as embedding
+               n.nomic_embedding as embedding
         """
         
         print(f"Finding exact match for term: '{term}'")
