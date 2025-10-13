@@ -77,7 +77,7 @@ class SemanticSearcher:
         Returns:
             List of dictionaries containing NCIT, PV, and CDE information.
         """
-         embedding = self.get_embedding(ncit_term)
+        embedding = self.get_embedding(ncit_term)
         if not embedding:
             return []
         
