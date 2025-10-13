@@ -5,7 +5,7 @@ Uses existing synonym finder and node matcher tools
 """
 from langchain.agents import initialize_agent, AgentType
 from langchain.memory import ConversationBufferMemory
-from langchain_community.llms import OpenAI
+from langchain_ollama import OllamaLLM 
 from .config import Config
 from .core_tools.tools import (
     SemanticPVSearchTool,
@@ -22,8 +22,8 @@ def create_fresh_agent():
     
     Config.validate()
     
-    # Initialize LLM
-    llm = OpenAI(temperature=0, model_name="gpt-3.5-turbo-instruct")
+    # Initialize LLM to use a local Ollama model
+    llm = OllamaLLM(model="llama3.1") # <-- MODIFIED: Instantiated local llama3.1 model
     
     # adding tools
     tools = [
@@ -127,4 +127,3 @@ def create_agent():
 def map_raw_data(agent, system_prompt, raw_value):
     """Legacy function for backward compatibility - DEPRECATED"""
     return map_raw_data_isolated(raw_value)
-
