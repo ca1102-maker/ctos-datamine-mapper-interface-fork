@@ -11,7 +11,7 @@ class SemanticSearcher:
                  username = Config.NEO4J_USERNAME,
                  password = Config.NEO4J_PASSWORD):
         
-        self.embedding_client = OllamaEmbeddings(model="nomic-embed-text")
+        self.embedding_client = OllamaEmbeddings(model="nomic-embed-text-8")
         
         # Initialize Neo4j driver
         self.driver = GraphDatabase.driver(uri, auth=(username, password))
