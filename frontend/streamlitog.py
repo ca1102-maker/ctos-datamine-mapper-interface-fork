@@ -5,6 +5,8 @@ import plotly.graph_objects as go
 from datetime import datetime, timedelta
 import random
 import math
+import requests
+import json
 
 # Page configuration
 st.set_page_config(
@@ -521,10 +523,10 @@ elif page == "📁 File Upload":
 
     # File upload area
     uploaded_files = st.file_uploader(
-        "Choose files for model training",
+        "Choose files for model training or term parsing",
         type=['csv', 'json', 'txt', 'pdf', 'xlsx'],
         accept_multiple_files=True,
-        help="Upload your training data files. Supported formats: CSV, JSON, TXT, PDF, XLSX"
+        help="Upload data or term files. For term parsing, use .txt or .json with comma-separated words."
     )
 
     if uploaded_files:
@@ -545,7 +547,43 @@ elif page == "📁 File Upload":
         df = pd.DataFrame(file_data)
         st.dataframe(df, use_container_width=True, hide_index=True)
 
-        # Processing options
+        # =========================================================
+        # 🔄 New Section: Send Uploaded File to Backend (Safe Insert)
+        # =========================================================
+        st.markdown("### 🔄 Send to Backend for Term Processing")
+        if st.button("🚀 Send to Backend"):
+            for file in uploaded_files:
+                try:
+                    # Parse uploaded file
+                    if file.name.endswith(".json"):
+                        data = json.load(file)
+                    else:
+                        content = file.read().decode("utf-8")
+                        terms = [t.strip() for t in content.split(",") if t.strip()]
+                        data = {"terms": terms}
+
+                    st.info(f"📤 Sending {file.name} with {len(data['terms'])} terms...")
+
+                    # Backend endpoint (update if needed)
+                    response = requests.post(
+                        "http://127.0.0.1:8000/parse_terms",
+                        json=data,
+                        timeout=10
+                    )
+
+                    if response.status_code == 200:
+                        result = response.json()
+                        st.success("✅ Backend processed successfully!")
+                        st.json(result)
+                    else:
+                        st.error(f"❌ Backend error {response.status_code}: {response.text}")
+
+                except Exception as e:
+                    st.error(f"⚠️ Error sending {file.name}: {e}")
+
+        # =========================================================
+        # Original Processing Options (Untouched)
+        # =========================================================
         st.markdown("---")
         st.subheader("⚙️ Processing Options")
 
@@ -577,7 +615,6 @@ elif page == "📁 File Upload":
             if st.button("▶️ Start Training", type="primary"):
                 with st.spinner("Processing files and starting training..."):
                     import time
-
                     time.sleep(2)
                 st.success("🚀 Training job initiated! Job ID: TRN-2025-0847")
         with col2:
@@ -595,7 +632,9 @@ elif page == "📁 File Upload":
         # Drag and drop area
         st.info("📤 Drag and drop files here or click to browse")
 
-    # Recent uploads
+    # =========================================================
+    # Original Recent Uploads Section (Untouched)
+    # =========================================================
     st.markdown("---")
     st.subheader("📜 Recent Training Jobs")
 
