@@ -8,7 +8,7 @@ This update enables the **frontend (Streamlit)** to send uploaded term files to 
 
 | File | Description |
 |------|--------------|
-| `app.py` | Main Streamlit frontend file (modified) |
+| `streamlitog.py` | Main Streamlit frontend file (modified) |
 | `mock_backend.py` | FastAPI mock backend for local testing |
 | `test_terms.txt` | Sample input file containing comma-separated terms |
 
