@@ -44,21 +44,19 @@ def get_embedding(self, text: str) -> list:
     
     def find_cde_from_pv_term(self, pv_term: str, top_k: int = 5):
         """
-        Search for CDEs by finding similar PV terms using semantic search
+        Search for CDEs by finding similar PV terms using semantic search.
         
         Args:
-            pv_term (str): The permissible value term to search for
-            top_k (int): Number of top results to return
+            pv_term (str): The permissible value term to search for.
+            top_k (int): Number of top results to return.
             
         Returns:
-            List of dictionaries containing PV and CDE information
+            List of dictionaries containing PV and CDE information.
         """
-        # Get embedding for the input term
         embedding = self.get_embedding(pv_term)
         if not embedding:
             return []
         
-        # Cypher query combining vector search with graph traversal
         query = """
         CALL db.index.vector.queryNodes('pvIndex', $top_k, $embedding) 
         YIELD node, score
@@ -85,21 +83,19 @@ def get_embedding(self, text: str) -> list:
     
     def find_cde_from_ncit_term(self, ncit_term: str, top_k: int = 5):
         """
-        Search for CDEs by finding similar NCIT concepts using semantic search
+        Search for CDEs by finding similar NCIT concepts using semantic search.
         
         Args:
-            ncit_term (str): The NCIT concept term to search for
-            top_k (int): Number of top results to return
+            ncit_term (str): The NCIT concept term to search for.
+            top_k (int): Number of top results to return.
             
         Returns:
-            List of dictionaries containing NCIT, PV, and CDE information
+            List of dictionaries containing NCIT, PV, and CDE information.
         """
-        # Get embedding for the input term
         embedding = self.get_embedding(ncit_term)
         if not embedding:
             return []
         
-        # Cypher query combining vector search with graph traversal
         query = """
         CALL db.index.vector.queryNodes('ncitIndex', $top_k, $embedding) 
         YIELD node, score

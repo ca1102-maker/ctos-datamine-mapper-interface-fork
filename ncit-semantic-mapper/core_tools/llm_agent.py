@@ -445,18 +445,24 @@ class SemanticNCITDefinitionTool(BaseTool):
     ) -> str:
         return self._run(query, run_manager=run_manager.get_sync() if run_manager else None)
 
+from pydantic import BaseModel
+from typing import Optional, List, Literal
+from json import dumps
+
+class NCITMappingOutput(BaseModel):
+    code: Optional[str]  # string OR null
+    term: Optional[str]  # string OR null
+    confidence: Literal["High", "Medium", "Low"]
+    reasoning: str
+    alternatives: List[str]
+
 
 def create_fresh_agent():
     """Create and configure the LangChain agent"""
     
     Config.validate()
     
-    # Initialize LLM with GPT-4o
-    llm = ChatOllama(
-        model="llama3",  # Using 'llama3' 
-        base_url=Config.OLLAMA_BASE_URL,
-        temperature=0
-    )
+    llm = OllamaLLM(model="llama3.1-8") 
     
      # adding tools in priority order
     tools = [
@@ -468,10 +474,9 @@ def create_fresh_agent():
         FuzzyTermMatcherTool(),
         
         # Synonym tools (medium priority) 
+        ParallelSearchTool(),
         SynonymFinderTool(),
         SynonymByCodeTool(),
-        
-        # Semantic search tools (fallback)
         SemanticPVSearchTool(),
         SemanticNCITSearchTool(),
         

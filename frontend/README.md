@@ -1,0 +1,21 @@
+# Frederick Platform — File → Backend Integration
+
+This update enables the **frontend (Streamlit)** to send uploaded term files to a backend API for processing (e.g., sorting or clustering medical terms).
+
+---
+
+## Components
+
+| File | Description |
+|------|--------------|
+| `streamlitog.py` | Main Streamlit frontend file (modified) |
+| `mock_backend.py` | FastAPI mock backend for local testing |
+| `test_terms.txt` | Sample input file containing comma-separated terms |
+
+---
+
+## Setup Instructions
+
+### 1️Install Dependencies
+```bash
+pip install streamlit fastapi uvicorn requests
