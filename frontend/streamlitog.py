@@ -8,6 +8,24 @@ import math
 import requests
 import json
 
+# to read the graph data txt
+def load_mock_graph_data(file_path="graph_data.txt"):
+    edges = []
+    nodes = set()
+    try:
+        with open(file_path, "r") as f:
+            for line in f:
+                if not line.strip() or line.startswith("#"):
+                    continue
+                term1, term2, score = [x.strip() for x in line.split(",")]
+                edges.append((term1, term2, float(score)))
+                nodes.update([term1, term2])
+        return list(nodes), edges
+    except Exception as e:
+        st.error(f"Error loading graph data: {e}")
+        return [], []
+
+
 # Page configuration
 st.set_page_config(
     page_title="Frederick Platform",
@@ -267,115 +285,74 @@ elif page == "🔗 Graph Visualization":
     st.markdown("---")
 
     # Create sample graph
+        # --- Load graph data (try backend first, fallback to local file) ---
+    try:
+        response = requests.get("http://127.0.0.1:8000/graph_data", timeout=5)
+        if response.status_code == 200:
+            data = response.json()
+            nodes = [n["name"] for n in data["nodes"]]
+            edges = [(e["source"], e["target"], e["similarity"]) for e in data["edges"]]
+            st.success("✅ Loaded graph data from mock backend")
+        else:
+            st.warning("⚠️ Backend request failed, using local file fallback.")
+            nodes, edges = load_mock_graph_data("graph_data.txt")
+    except Exception:
+        st.warning("⚠️ Backend not running, using local file fallback.")
+        nodes, edges = load_mock_graph_data("graph_data.txt")
+    
+    # --- Graph visualization ---
     if st.button("🔄 Generate Graph") or st.session_state.graph_data is None:
-        # Create a sample graph without networkx
-        num_nodes = min(max_nodes, 50)
-
-        # Generate node positions based on layout
-        node_x = []
-        node_y = []
-
-        if layout == "Circular":
-            # Circular layout
-            for i in range(num_nodes):
-                angle = 2 * math.pi * i / num_nodes
-                node_x.append(math.cos(angle))
-                node_y.append(math.sin(angle))
-        elif layout == "Hierarchical":
-            # Simple hierarchical layout
-            levels = 4
-            nodes_per_level = num_nodes // levels
-            for i in range(num_nodes):
-                level = i // nodes_per_level
-                pos_in_level = i % nodes_per_level
-                node_x.append(pos_in_level * 2.0 / nodes_per_level - 1)
-                node_y.append(1 - level * 2.0 / levels)
-        elif layout == "Force-directed":
-            # Simulated force-directed layout (simplified)
-            np.random.seed(42)
-            node_x = np.random.randn(num_nodes) * 2
-            node_y = np.random.randn(num_nodes) * 2
-            # Simple spreading
-            for _ in range(10):
-                for i in range(num_nodes):
-                    for j in range(i + 1, num_nodes):
-                        dx = node_x[i] - node_x[j]
-                        dy = node_y[i] - node_y[j]
-                        dist = math.sqrt(dx * dx + dy * dy) + 0.01
-                        if dist < 1:
-                            force = (1 - dist) * 0.05
-                            node_x[i] += dx / dist * force
-                            node_y[i] += dy / dist * force
-                            node_x[j] -= dx / dist * force
-                            node_y[j] -= dy / dist * force
-        else:  # Random
-            node_x = np.random.randn(num_nodes)
-            node_y = np.random.randn(num_nodes)
-
-        # Create edges (random connections)
-        edges = []
-        edge_x = []
-        edge_y = []
-
-        # Generate random edges
-        for i in range(num_nodes):
-            # Each node connects to 1-4 other nodes
-            num_connections = random.randint(1, min(4, num_nodes - 1))
-            for _ in range(num_connections):
-                j = random.randint(0, num_nodes - 1)
-                if i != j and (i, j) not in edges and (j, i) not in edges:
-                    edges.append((i, j))
-                    edge_x.extend([node_x[i], node_x[j], None])
-                    edge_y.extend([node_y[i], node_y[j], None])
-
-        # Create edge trace
-        edge_trace = go.Scatter(
-            x=edge_x, y=edge_y,
-            line=dict(width=0.5, color='rgba(125, 125, 125, 0.5)'),
-            hoverinfo='none',
-            mode='lines')
-
-        # Create node trace
-        node_text = []
-        node_color = []
-
-        node_types = ['Person', 'Document', 'Concept', 'Organization']
-        type_colors = {'Person': '#4fc3f7', 'Document': '#4caf50',
-                       'Concept': '#ff9800', 'Organization': '#9c27b0'}
-
-        for i in range(num_nodes):
-            n_type = random.choice(node_types)
-            node_text.append(f"{n_type}_{i}")
-            node_color.append(type_colors[n_type])
-
-        node_trace = go.Scatter(
-            x=node_x, y=node_y,
-            mode='markers+text',
-            hoverinfo='text',
-            text=node_text,
-            textposition="top center",
-            marker=dict(
-                showscale=False,
-                color=node_color,
-                size=15,
-                line_width=2))
-
-        # Create figure
-        fig = go.Figure(data=[edge_trace, node_trace],
-                        layout=go.Layout(
-                            showlegend=False,
-                            hovermode='closest',
-                            margin=dict(b=0, l=0, r=0, t=0),
-                            xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
-                            yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
-                            template='plotly_dark',
-                            height=600,
-                            paper_bgcolor='rgba(0,0,0,0)',
-                            plot_bgcolor='rgba(0,0,0,0)'
-                        ))
-
-        st.plotly_chart(fig, use_container_width=True)
-        st.session_state.graph_data = fig
+        if not nodes:
+            st.warning("No graph data found. Please check 'graph_data.txt'.")
+        else:
+            node_positions = {node: (random.random() * 2 - 1, random.random() * 2 - 1) for node in nodes}
+    
+            edge_x, edge_y, hover_text = [], [], []
+            for term1, term2, score in edges:
+                x0, y0 = node_positions[term1]
+                x1, y1 = node_positions[term2]
+                edge_x += [x0, x1, None]
+                edge_y += [y0, y1, None]
+                hover_text.append(f"{term1} ↔ {term2}: {score*100:.1f}% similarity")
+    
+            edge_trace = go.Scatter(
+                x=edge_x,
+                y=edge_y,
+                line=dict(width=2, color='rgba(180,180,180,0.5)'),
+                hoverinfo='text',
+                text=hover_text,
+                mode='lines'
+            )
+    
+            node_x = [pos[0] for pos in node_positions.values()]
+            node_y = [pos[1] for pos in node_positions.values()]
+            node_text = list(nodes)
+    
+            node_trace = go.Scatter(
+                x=node_x,
+                y=node_y,
+                mode='markers+text',
+                text=node_text,
+                textposition="top center",
+                hoverinfo='text',
+                marker=dict(size=20, color='#4fc3f7', line_width=2, opacity=0.9)
+            )
+    
+            fig = go.Figure(data=[edge_trace, node_trace],
+                            layout=go.Layout(
+                                showlegend=False,
+                                hovermode='closest',
+                                margin=dict(b=0, l=0, r=0, t=0),
+                                xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+                                yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+                                template='plotly_dark',
+                                height=600,
+                                paper_bgcolor='rgba(0,0,0,0)',
+                                plot_bgcolor='rgba(0,0,0,0)'
+                            ))
+    
+            st.plotly_chart(fig, use_container_width=True)
+            st.session_state.graph_data = fig
     else:
         st.plotly_chart(st.session_state.graph_data, use_container_width=True)
 
