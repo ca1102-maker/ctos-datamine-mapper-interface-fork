@@ -228,31 +228,24 @@ elif page == "💬 AI Chat":
         with st.chat_message("user"):
             st.markdown(prompt)
 
-        # Simulate AI response
-        with st.chat_message("assistant"):
-            with st.spinner("Thinking..."):
-                import time
+# === Real ChatGPT API call via backend ===
+with st.chat_message("assistant"):
+    with st.spinner("Thinking..."):
+        try:
+            response = requests.post(
+                "http://127.0.0.1:8000/chat",   # backend endpoint
+                json={"message": prompt},
+                timeout=30
+            )
 
-                time.sleep(1)
-
-                # Mock RAG response
-                response = f"""Based on the knowledge base, here's what I found:
-
-**Relevant Documents:** 3 matches found
-- Document A (95% relevance): Contains information about {prompt[:20]}...
-- Document B (87% relevance): Related context on the topic
-- Document C (76% relevance): Supporting information
-
-**Answer:** 
-This is a simulated response to your query about "{prompt}". In a real implementation, 
-this would retrieve relevant information from your vector database and provide a 
-synthesized answer based on your documents.
-
-**Confidence Score:** 92%
-**Sources:** [Doc-2847], [Doc-3921], [Doc-1052]"""
-
-                st.markdown(response)
-                st.session_state.messages.append({"role": "assistant", "content": response})
+            if response.status_code == 200:
+                reply = response.json().get("reply", "")
+                st.markdown(reply)
+                st.session_state.messages.append({"role": "assistant", "content": reply})
+            else:
+                st.error(f"Backend error: {response.status_code}")
+        except Exception as e:
+            st.error(f"⚠️ Could not connect to backend: {e}")
 
     # Sidebar with chat options
     with st.sidebar:
