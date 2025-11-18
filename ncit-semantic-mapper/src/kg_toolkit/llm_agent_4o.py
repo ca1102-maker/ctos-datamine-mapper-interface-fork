@@ -8,7 +8,7 @@ Updated for Ollama compatibility
 import os
 from typing import Optional
 from langchain.agents import create_react_agent, AgentExecutor
-from langchain_ollama import OllamaLLM  # <-- MODIFIED
+from langchain_ollama import OllamaLLM  
 from langchain_core.tools import BaseTool
 from langchain_core.callbacks import (
     AsyncCallbackManagerForToolRun,
@@ -18,7 +18,6 @@ from langchain_core.prompts import PromptTemplate
 from langchain.memory import ConversationBufferMemory
 from pydantic import BaseModel, Field
 
-# --- MODIFIED: Use correct relative import paths for the new structure ---
 from .synonym_tool import get_synonyms
 from .exact_match import get_node_match
 from .semantic_retrievers import SemanticSearcher
@@ -28,13 +27,10 @@ class Config:
     NEO4J_URI = os.getenv("NEO4J_URI")
     NEO4J_USERNAME = os.getenv("NEO4J_USERNAME")
     NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD")
-    # --- MODIFIED: OPENAI_API_KEY is no longer used by the agent ---
-    OPENAI_API_KEY = os.getenv("OPENAI_API_KEY") 
     
     @classmethod
     def validate(cls):
         """Validate that all required environment variables are set"""
-        # --- MODIFIED: Removed OpenAI API key validation ---
         if not cls.NEO4J_URI or not cls.NEO4J_USERNAME:
             raise ValueError(
                 "Neo4j credentials not found. Please set these environment variables:\n"
@@ -247,11 +243,11 @@ class SemanticPVSearchTool(BaseTool):
         query: str, 
         run_manager: Optional[CallbackManagerForToolRun] = None
     ) -> str:
-        searcher = None # <-- MODIFIED: Initialize for finally block
+        searcher = None # 
         try:
             searcher = SemanticSearcher()
             results = searcher.find_cde_from_pv_term(query.strip(), top_k=3)
-            # searcher.close() <-- MODIFIED: Moved to finally block
+            # searcher.close()
             
             if not results:
                 return f"No semantic matches found for PV term '{query}'"
@@ -274,7 +270,7 @@ class SemanticPVSearchTool(BaseTool):
             
         except Exception as e:
             return f"Error in semantic PV search: {str(e)}"
-        finally: # <-- MODIFIED: Added finally block
+        finally: 
             if searcher:
                 searcher.close()
     
@@ -301,11 +297,11 @@ class SemanticNCITSearchTool(BaseTool):
         query: str, 
         run_manager: Optional[CallbackManagerForToolRun] = None
     ) -> str:
-        searcher = None # <-- MODIFIED: Initialize for finally block
+        searcher = None # 
         try:
             searcher = SemanticSearcher()
             results = searcher.find_cde_from_ncit_term(query.strip(), top_k=3)
-            # searcher.close() <-- MODIFIED: Moved to finally block
+            # searcher.close()
             
             if not results:
                 return f"No semantic matches found for NCIT term '{query}'"
@@ -331,7 +327,7 @@ class SemanticNCITSearchTool(BaseTool):
             
         except Exception as e:
             return f"Error in semantic NCIT search: {str(e)}"
-        finally: # <-- MODIFIED: Added finally block
+        finally: 
             if searcher:
                 searcher.close()
     
@@ -358,11 +354,11 @@ class SemanticCDEDefinitionTool(BaseTool):
         query: str, 
         run_manager: Optional[CallbackManagerForToolRun] = None
     ) -> str:
-        searcher = None # <-- MODIFIED: Initialize for finally block
+        searcher = None 
         try:
             searcher = SemanticSearcher()
             results = searcher.find_cde_by_definition_similarity(query.strip(), top_k=3)
-            # searcher.close() <-- MODIFIED: Moved to finally block
+            # searcher.close() 
             
             if not results:
                 return f"No CDE definition matches found for '{query}'"
@@ -387,7 +383,7 @@ class SemanticCDEDefinitionTool(BaseTool):
             
         except Exception as e:
             return f"Error in semantic CDE definition search: {str(e)}"
-        finally: # <-- MODIFIED: Added finally block
+        finally: 
             if searcher:
                 searcher.close()
 
@@ -414,11 +410,10 @@ class SemanticNCITDefinitionTool(BaseTool):
         query: str, 
         run_manager: Optional[CallbackManagerForToolRun] = None
     ) -> str:
-        searcher = None # <-- MODIFIED: Initialize for finally block
+        searcher = None 
         try:
             searcher = SemanticSearcher()
             results = searcher.find_ncit_by_definition_similarity(query.strip(), top_k=3)
-            # searcher.close() <-- MODIFIED: Moved to finally block
             
             if not results:
                 return f"No NCIT definition matches found for '{query}'"
@@ -460,7 +455,6 @@ def create_fresh_agent():
     
     Config.validate()
     
-    # --- MODIFIED: Switched from ChatOpenAI to OllamaLLM ---
     llm = OllamaLLM(
         model="llama3.1-8",
         temperature=0,
@@ -585,7 +579,6 @@ def map_raw_data_isolated(agent_executor, system_prompt, raw_value):
     """Map a raw data value to NCIT terminology"""
     
     try:
-        # --- MODIFIED: The new AgentExecutor uses 'invoke' with a dictionary input ---
         response = agent_executor.invoke({"input": f"Raw medical data value to map: \"{raw_value}\""})
         return response["output"]
     except Exception as e:
@@ -638,7 +631,6 @@ def main():
                 
     except Exception as e:
         print(f"Error: {e}")
-        # --- MODIFIED: Updated error message ---
         print("Make sure your Neo4j database and Ollama server are running.")
 
 if __name__ == "__main__":
