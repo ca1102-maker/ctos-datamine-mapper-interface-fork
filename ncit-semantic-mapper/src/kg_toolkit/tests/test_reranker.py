@@ -4,13 +4,20 @@ Testing script to compare baseline vs context-aware semantic search
 for PV -> CDE mapping.
 """
 
-from semantic_retrievers import SemanticSearcher
+import os
+from dotenv import load_dotenv
+
+from kg_toolkit.semantic_retrievers import SemanticSearcher
+
+# Load environment variables from the .env file in the project root
+load_dotenv()
 
 def print_separator():
+    """Prints a consistent separator line."""
     print("=" * 80)
 
 def print_results(results, title):
-    """Format and print search results."""
+    """Formats and prints the search results in a readable way."""
     print_separator()
     print(f"{title} (Total Results: {len(results)})")
     print_separator()
@@ -20,57 +27,62 @@ def print_results(results, title):
         return
 
     for i, result in enumerate(results, 1):
-        meta = result['metadata']
+        meta = result.get('metadata', {})
         score = meta.get('score', 0.0)
-        combined_score = meta.get('combined_score', None)
-        oc_term = meta.get('oc_term', None)
+        combined_score = meta.get('combined_score')
+        oc_term = meta.get('oc_term')
 
         print(f"\nResult {i}")
-        print(f"  CDE: {meta.get('cde_term')} (Code: {meta.get('cde')})")
-        print(f"  PV: {meta.get('pv_term')} (Code: {meta.get('pv_code')})")
+        print(f"  CDE: {meta.get('cde_term', 'N/A')} (Code: {meta.get('cde', 'N/A')})")
+        print(f"  PV: {meta.get('pv_term', 'N/A')} (Code: {meta.get('pv_code', 'N/A')})")
         print(f"  Baseline Score: {score:.4f}")
         if combined_score is not None:
             print(f"  Combined Score (with OC): {combined_score:.4f}")
         if oc_term:
             print(f"  Object Class: {oc_term}")
 
-        definition = result['text']
+        definition = result.get('text', '')
         if len(definition) > 100:
             definition = definition[:97] + "..."
         print(f"  Definition: {definition}")
+    print()
 
 def main():
+    """Main function to run the interactive test session."""
     print("Initializing semantic searcher for context-aware testing...\n")
-    searcher = SemanticSearcher()
-
+    searcher = None
     try:
+        searcher = SemanticSearcher()
+
         while True:
             search_term = input("Enter PV term to test (or 'quit' to exit): ").strip()
             if search_term.lower() in ['quit', 'exit', 'q']:
-                print("Exiting test.")
                 break
 
-            top_k = input("Number of results to display (default 5): ").strip()
-            top_k = int(top_k) if top_k.isdigit() else 5
+            top_k_str = input("Number of results to display (default 5): ").strip()
+            top_k = int(top_k_str) if top_k_str.isdigit() else 5
 
             print("\nRunning baseline search...")
             baseline_results = searcher.find_cde_from_pv_term(search_term, top_k=top_k)
             print_results(baseline_results, "Baseline Search Results")
 
-            print("\nRunning context-aware search...")
+            print("\nRunning context-aware search (with OC re-ranking)...")
             context_results = searcher.contextaware_cde_from_pv(search_term, top_k=top_k)
             print_results(context_results, "Context-Aware Search Results")
 
-            print("\n" + "-" * 80)
+            print("-" * 80)
             cont = input("Run another test? (y/n): ").strip().lower()
             if cont not in ['y', 'yes']:
                 break
 
     except KeyboardInterrupt:
-        print("\nInterrupted. Exiting.")
+        print("\nInterrupted.")
+    except Exception as e:
+        print(f"\nAn error occurred: {e}")
     finally:
-        searcher.close()
-        print("Database connection closed.")
+        if searcher:
+            searcher.close()
+        print("Exiting test. Database connection closed.")
 
 if __name__ == "__main__":
     main()

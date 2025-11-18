@@ -1,62 +1,74 @@
 import os
-from ollama import Client
 from neo4j import GraphDatabase
 import numpy as np
+from dotenv import load_dotenv
 
-#from dotenv import load_dotenv
+# --- MODIFIED: Switched to Ollama embeddings ---
+from langchain_ollama.embeddings import OllamaEmbeddings
 
 #load_dotenv()
 
 class SemanticSearcher:
-def __init__(self):
-        #  Initialize Ollama client
-        self.OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-        self.ollama_client = Client(host=self.OLLAMA_BASE_URL)
+    def __init__(self, uri=None, username=None, password=None):
+        # --- MODIFIED: Replaced OpenAI client with OllamaEmbeddings client ---
+        load_dotenv()
+        self.uri = uri or os.getenv("NEO4J_URI")
+        self.username = username or os.getenv("NEO4J_USERNAME")
+        self.password = password or os.getenv("NEO4J_PASSWORD")
+
+        if not all([self.uri, self.username, self.password]):
+            raise ValueError("Neo4j credentials not provided or found in environment variables.")
+            
+        self.embedding_client = OllamaEmbeddings(model="nomic-embed-text-8")
         
         # Initialize Neo4j driver
         self.driver = GraphDatabase.driver(
-            os.getenv('NEO4J_URI'),
-            auth=(os.getenv('NEO4J_USERNAME'), os.getenv('NEO4J_PASSWORD'))
-        )    
-def get_embedding(self, text: str) -> list:
+            self.uri,
+            auth=(self.username, self.password)
+        )
+    
+    def get_embedding(self, text: str) -> list:
         """
-         Convert text to embedding vector using Ollama's nomic-embed-text model
+        Convert text to embedding vector using the local nomic-embed-text model.
         """
+        # --- MODIFIED: Use the new client to generate embeddings ---
         try:
-            # Use the Ollama client to generate embeddings
-            response = self.ollama_client.embeddings(
-                model="nomic-embed-text",  # This must match the model used for your DB embeddings
-                prompt=text
-            )
-            return response['embedding']
+            if not text:
+                return None
+            return self.embedding_client.embed_query(text)
         except Exception as e:
-            print(f"Error generating embedding from Ollama: {e}")
+            print(f"Error generating Nomic embedding: {e}")
             return None
-
-
+    
     def cosine_similarity(self, vec1, vec2):
         if vec1 is None or vec2 is None:
             return 0
         v1 = np.array(vec1)
         v2 = np.array(vec2)
-        return float(np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2)))
+        norm_v1 = np.linalg.norm(v1)
+        norm_v2 = np.linalg.norm(v2)
+        if norm_v1 == 0 or norm_v2 == 0:
+            return 0.0
+        return float(np.dot(v1, v2) / (norm_v1 * norm_v2))
 
     
     def find_cde_from_pv_term(self, pv_term: str, top_k: int = 5):
         """
-        Search for CDEs by finding similar PV terms using semantic search.
+        Search for CDEs by finding similar PV terms using semantic search
         
         Args:
-            pv_term (str): The permissible value term to search for.
-            top_k (int): Number of top results to return.
+            pv_term (str): The permissible value term to search for
+            top_k (int): Number of top results to return
             
         Returns:
-            List of dictionaries containing PV and CDE information.
+            List of dictionaries containing PV and CDE information
         """
+        # Get embedding for the input term
         embedding = self.get_embedding(pv_term)
         if not embedding:
             return []
         
+        # Cypher query combining vector search with graph traversal
         query = """
         CALL db.index.vector.queryNodes('pvIndex', $top_k, $embedding) 
         YIELD node, score
@@ -83,19 +95,21 @@ def get_embedding(self, text: str) -> list:
     
     def find_cde_from_ncit_term(self, ncit_term: str, top_k: int = 5):
         """
-        Search for CDEs by finding similar NCIT concepts using semantic search.
+        Search for CDEs by finding similar NCIT concepts using semantic search
         
         Args:
-            ncit_term (str): The NCIT concept term to search for.
-            top_k (int): Number of top results to return.
+            ncit_term (str): The NCIT concept term to search for
+            top_k (int): Number of top results to return
             
         Returns:
-            List of dictionaries containing NCIT, PV, and CDE information.
+            List of dictionaries containing NCIT, PV, and CDE information
         """
+        # Get embedding for the input term
         embedding = self.get_embedding(ncit_term)
         if not embedding:
             return []
         
+        # Cypher query combining vector search with graph traversal
         query = """
         CALL db.index.vector.queryNodes('ncitIndex', $top_k, $embedding) 
         YIELD node, score
@@ -280,5 +294,5 @@ def get_embedding(self, text: str) -> list:
 
     def close(self):
         """Close the Neo4j driver connection"""
-        self.driver.close()
-        
+        if self.driver:
+            self.driver.close()
