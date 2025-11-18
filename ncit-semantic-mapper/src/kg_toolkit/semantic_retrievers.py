@@ -3,14 +3,12 @@ from neo4j import GraphDatabase
 import numpy as np
 from dotenv import load_dotenv
 
-# --- MODIFIED: Switched to Ollama embeddings ---
 from langchain_ollama.embeddings import OllamaEmbeddings
 
 #load_dotenv()
 
 class SemanticSearcher:
     def __init__(self, uri=None, username=None, password=None):
-        # --- MODIFIED: Replaced OpenAI client with OllamaEmbeddings client ---
         load_dotenv()
         self.uri = uri or os.getenv("NEO4J_URI")
         self.username = username or os.getenv("NEO4J_USERNAME")
@@ -31,7 +29,6 @@ class SemanticSearcher:
         """
         Convert text to embedding vector using the local nomic-embed-text model.
         """
-        # --- MODIFIED: Use the new client to generate embeddings ---
         try:
             if not text:
                 return None
