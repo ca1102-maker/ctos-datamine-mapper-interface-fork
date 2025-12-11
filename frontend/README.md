@@ -15,10 +15,11 @@ This update enables the **frontend (Streamlit)** to send uploaded term files to 
 ---
 
 ## Setup Instructions
-
 ### 1️Install Dependencies
 ```bash
 pip install streamlit fastapi uvicorn requests
+
+```
 
 # Neo4j Knowledge Graph Frontend
 
@@ -142,29 +143,3 @@ The frontend is implemented as a modern single-page application, using:
 > Note: Exact versions and dependencies are defined in `package.json` for the repository.
 
 ---
-
-## Project Structure (High-Level)
-
-The structure below reflects the main conceptual areas of the frontend; your actual folder names may vary slightly.
-
-```bash
-frontend/
-├── public/                     # Static assets (logos, icons, favicons)
-├── src/
-│   ├── components/
-│   │   ├── layout/             # Sidebar, header, quick stats
-│   │   ├── graph/              # Knowledge graph visualization components
-│   │   ├── chat/               # Chat panel, message list, input box
-│   │   ├── upload/             # File upload, progress, and jobs table
-│   │   └── common/             # Buttons, modals, tables, form controls
-│   ├── pages/                  # Top-level views / routes
-│   │   ├── Dashboard.tsx
-│   │   ├── GraphVisualization.tsx
-│   │   ├── FileUpload.tsx
-│   │   └── Chat.tsx
-│   ├── hooks/                  # Custom hooks (API calls, state, polling)
-│   ├── lib/                    # API clients, config, utility functions
-│   ├── styles/                 # Global styles and theme tokens
-│   └── main.tsx / index.tsx    # Application entry point
-├── package.json
-└── tsconfig.json / vite.config.* / next.config.*  # Build tooling
