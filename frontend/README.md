@@ -10,7 +10,7 @@ This update enables the **frontend (Streamlit)** to send uploaded term files to 
 |------|--------------|
 | `streamlitog.py` | Main Streamlit frontend file (modified) |
 | `mock_backend.py` | FastAPI mock backend for local testing |
-| `test_terms.txt` | Sample input file containing comma-separated terms |
+| `mock_xxx.txt` | Sample input file containing comma-separated terms |
 
 ---
 
@@ -135,11 +135,6 @@ This layout is intended to be intuitive for analysts who regularly move between 
 
 The frontend is implemented as a modern single-page application, using:
 
-- **React** (with TypeScript) for component-based UI
-- **REST / JSON** API integration with the Neo4j and RAG backend services
-- **Reusable components** for graph rendering, file upload, chat, and tables
-- **CSS / design system** tuned for dark-mode, dashboard-style visuals
-
-> Note: Exact versions and dependencies are defined in `package.json` for the repository.
+- **Streamlit** 
 
 ---
