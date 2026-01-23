@@ -215,6 +215,9 @@ export default function GraphVisualization() {
         ? selectedNodes.map((n) => nameToIdx.get(n)).filter((v): v is number => typeof v === 'number')
         : null
 
+    // Calculate nodes curveNumber: edges are always 0, selected edges (if any) are 1, nodes are last
+    const nodesCurveNumber = selectedSet.size > 0 ? 2 : 1
+
     return {
       data: [
         {
@@ -264,31 +267,36 @@ export default function GraphVisualization() {
           showlegend: false,
         },
       ],
-      config: { displayModeBar: false, scrollZoom: true, doubleClick: 'reset' as const, responsive: true },
+      nodesCurveNumber, // Store this for use in event handlers
+      config: { 
+        displayModeBar: false, 
+        scrollZoom: true, 
+        doubleClick: 'reset' as const, 
+        responsive: true,
+        // Ensure clicks work even when dragmode is active
+        staticPlot: false,
+      },
     }
   }, [graphData, selectedNodes])
 
-  // Stable layout reference - dragmode is updated via relayout to preserve view state
-  const plotLayout = useMemo(() => ({
-    showlegend: false,
-    hovermode: 'closest' as const,
-    margin: { b: 0, l: 0, r: 0, t: 0 },
-    xaxis: { showgrid: false, zeroline: false, showticklabels: false },
-    yaxis: { showgrid: false, zeroline: false, showticklabels: false },
-    dragmode: 'pan' as const, // Initial default, will be updated via relayout
-    autosize: true,
-    template: 'plotly_dark' as unknown as Plotly.Template,
-    paper_bgcolor: 'rgba(0,0,0,0)',
-    plot_bgcolor: 'rgba(0,0,0,0)',
-  }), []) // No dependencies - stable reference
-
-  // Update only dragmode without re-rendering or resetting view
-  useEffect(() => {
-    if (plotDivRef.current) {
-      const newDragmode = interactionMode === 'pointer' ? false : interactionMode
-      relayout({ dragmode: newDragmode })
+  // Compute dragmode from interactionMode
+  const dragmode = interactionMode === 'pointer' ? 'select' : interactionMode
+  
+  // Layout includes dragmode so it updates when mode changes
+  const plotLayout = useMemo(() => {
+    return {
+      showlegend: false,
+      hovermode: 'closest' as const,
+      margin: { b: 0, l: 0, r: 0, t: 0 },
+      xaxis: { showgrid: false, zeroline: false, showticklabels: false },
+      yaxis: { showgrid: false, zeroline: false, showticklabels: false },
+      dragmode: dragmode as 'pan' | 'zoom' | 'select',
+      autosize: true,
+      template: 'plotly_dark' as unknown as Plotly.Template,
+      paper_bgcolor: 'rgba(0,0,0,0)',
+      plot_bgcolor: 'rgba(0,0,0,0)',
     }
-  }, [interactionMode])
+  }, [dragmode])
 
   const normalizedSearch = search.trim().toLowerCase()
   const searchMatches = useMemo(() => {
@@ -713,7 +721,9 @@ export default function GraphVisualization() {
                   <TooltipTrigger asChild>
                     <button
                       type="button"
-                      onClick={() => setInteractionMode('pointer')}
+                      onClick={() => {
+                        setInteractionMode('pointer')
+                      }}
                       className={`h-8 w-8 grid place-items-center rounded-lg transition-colors ${
                         interactionMode === 'pointer' ? 'bg-cyan-600 dark:bg-emerald-600 text-white shadow-sm' : 'hover:bg-white/60 dark:hover:bg-slate-700/60 text-slate-600 dark:text-slate-300'
                       }`}
@@ -729,7 +739,9 @@ export default function GraphVisualization() {
                   <TooltipTrigger asChild>
                     <button
                       type="button"
-                      onClick={() => setInteractionMode('pan')}
+                      onClick={() => {
+                        setInteractionMode('pan')
+                      }}
                       className={`h-8 w-8 grid place-items-center rounded-lg transition-colors ${
                         interactionMode === 'pan' ? 'bg-cyan-600 dark:bg-emerald-600 text-white shadow-sm' : 'hover:bg-white/60 dark:hover:bg-slate-700/60 text-slate-600 dark:text-slate-300'
                       }`}
@@ -826,44 +838,75 @@ export default function GraphVisualization() {
                     plotDivRef.current = gd
                   }}
                   onSelected={(e: Readonly<PlotSelectionEvent>) => {
-                    if (!e?.points || !graphData) return
-                    const pts = e.points.filter((p) => p.curveNumber === 1)
+                    if (!e?.points || !graphData || !plotData) return
+                    
+                    const pts = e.points.filter((p) => p.curveNumber === plotData.nodesCurveNumber)
                     const names = pts
                       .map((p) => graphData.nodes?.[p.pointIndex]?.name ?? p.text)
                       .filter((v): v is string => typeof v === 'string')
-                    setSelectedNodes(Array.from(new Set(names)))
-                    setNodePopover(null)
+                
+                    // Only auto-select if it's a drag selection (multiple points)
+                    // Single clicks should show the popover via onClick instead
+                    if (names.length > 1) {
+                      setSelectedNodes(Array.from(new Set(names)))
+                      setNodePopover(null)
+                    } else if (names.length === 1) {
+                      // Single point selection - let onClick handle showing popover
+                      // But if it's already selected, we can update the selection
+                      if (selectedNodes.includes(names[0])) {
+                        // Already selected, just update (might be a re-selection)
+                        setSelectedNodes([names[0]])
+                        setNodePopover(null)
+                      }
+                      // Otherwise, onClick will show the popover
+                    }
                   }}
                   onDeselect={() => {
                     setSelectedNodes([])
                     setNodePopover(null)
                   }}
                   onClick={(e: Readonly<PlotMouseEvent>) => {
-                    if (!e?.points?.length || !graphData) return
-                    const p = e.points[0]
-                    if (p.curveNumber !== 1) return
-                    const name = graphData.nodes?.[p.pointIndex]?.name ?? (p as { text?: string }).text
-                    if (typeof name !== 'string') return
+                    if (!e?.points?.length || !graphData || !plotData) return
+                    
+                    // Find the node point (check all points in case the first isn't a node)
+                    let nodePoint = null
+                    let nodeName: string | null = null
+                    
+                    for (const p of e.points) {
+                      // Nodes are at the nodesCurveNumber
+                      if (p.curveNumber === plotData.nodesCurveNumber) {
+                        const name = graphData.nodes?.[p.pointIndex]?.name ?? (p as { text?: string }).text
+                        if (typeof name === 'string') {
+                          nodePoint = p
+                          nodeName = name
+                          break
+                        }
+                      }
+                    }
+                    
+                    console.log('[onClick] node clicked:', nodeName)
+                    if (!nodeName) return
+                    
                     const shift = Boolean((e.event as MouseEvent)?.shiftKey)
                     if (shift) {
+                      // Shift+click: add to selection immediately
                       setSelectedNodes((prev) => {
-                        if (prev.includes(name)) return prev
-                        return [...prev, name]
+                        if (prev.includes(nodeName!)) return prev
+                        return [...prev, nodeName!]
                       })
                       setNodePopover(null)
                       return
                     }
 
-                    // Click opens a popover (doesn't immediately change selection)
                     const native = e?.event as MouseEvent | undefined
                     if (!native) {
-                      setNodePopover({ name, screenX: 24, screenY: 24 })
+                      setNodePopover({ name: nodeName, screenX: 24, screenY: 24 })
                       return
                     }
                     const rect = canvasRef.current?.getBoundingClientRect()
                     const x = rect ? native.clientX - rect.left : native.clientX
                     const y = rect ? native.clientY - rect.top : native.clientY
-                    setNodePopover({ name, screenX: x, screenY: y })
+                    setNodePopover({ name: nodeName, screenX: x, screenY: y })
                   }}
                 />
               ) : (
