@@ -39,8 +39,8 @@ cd react-frontend
 
 ```bash
 # 
-npm install -g pnpm
-pnpm install
+npm install pnpm
+npx pnpm install
 ```
 
 ### Development
@@ -49,7 +49,7 @@ Run the development server:
 
 ```bash
 # 
-pnpm dev
+npx pnpm dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
