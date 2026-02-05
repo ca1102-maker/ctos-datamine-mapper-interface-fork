@@ -1,7 +1,7 @@
-## How to Run the Server Locally Using Anvil
+# How to Run the Server Locally Using Anvil
 
-# Disclaimer
-Our current working directory is react-frontend. As Meky demonstrated during the meeting two weeks ago, the frontend UI has been improved significantly. We are currently in the process of integrating the Neo4j database, which represents the first major step in this phase of development.
+## Disclaimer
+# Our current working directory is react-frontend. As Meky demonstrated during the meeting two weeks ago, the frontend UI has been improved significantly. We are currently in the process of integrating the Neo4j database, which represents the first major step in this phase of development.
 
 Before proceeding with the integration, follow the step-by-step instructions below to launch the application locally.
 
