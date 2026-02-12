@@ -109,7 +109,8 @@ colors: {
 - Check browser console for errors
 
 ## How to use Makefile
-- from inside, react-frontend path, use command 'make dev'
+- from inside, react-frontend path, use command `make dev`
+- this will install pnpm locally (if not already installed), project dependencies, and start next.js on port 4000.
 
 © 2025 Frederick Platform
 
