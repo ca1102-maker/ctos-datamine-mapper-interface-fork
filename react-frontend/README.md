@@ -108,6 +108,8 @@ colors: {
 - Ensure `react-plotly.js` is installed
 - Check browser console for errors
 
+## How to use Makefile
+- from inside, react-frontend path, use command 'make dev'
 
 © 2025 Frederick Platform
 
