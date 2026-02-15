@@ -17,7 +17,7 @@ class SemanticSearcher:
         if not all([self.uri, self.username, self.password]):
             raise ValueError("Neo4j credentials not provided or found in environment variables.")
             
-        self.embedding_client = OllamaEmbeddings(model="nomic-embed-text-8")
+        self.embedding_client = OllamaEmbeddings(model="nomic-embed-text-64")
         
         # Initialize Neo4j driver
         self.driver = GraphDatabase.driver(

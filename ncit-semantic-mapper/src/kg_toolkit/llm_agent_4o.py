@@ -458,7 +458,7 @@ def create_fresh_agent():
     Config.validate()
     
     llm = OllamaLLM(
-        model="llama3.1-8",
+        model="llama3.1-64",
         temperature=0,
     )
     
