@@ -245,11 +245,10 @@ class SemanticPVSearchTool(BaseTool):
         query: str, 
         run_manager: Optional[CallbackManagerForToolRun] = None
     ) -> str:
-        searcher = None # 
+        searcher = None 
         try:
             searcher = SemanticSearcher()
             results = searcher.find_cde_from_pv_term(query.strip(), top_k=3)
-            # searcher.close()
             
             if not results:
                 return f"No semantic matches found for PV term '{query}'"
@@ -299,11 +298,10 @@ class SemanticNCITSearchTool(BaseTool):
         query: str, 
         run_manager: Optional[CallbackManagerForToolRun] = None
     ) -> str:
-        searcher = None # 
+        searcher = None 
         try:
             searcher = SemanticSearcher()
             results = searcher.find_cde_from_ncit_term(query.strip(), top_k=3)
-            # searcher.close()
             
             if not results:
                 return f"No semantic matches found for NCIT term '{query}'"
@@ -360,7 +358,6 @@ class SemanticCDEDefinitionTool(BaseTool):
         try:
             searcher = SemanticSearcher()
             results = searcher.find_cde_by_definition_similarity(query.strip(), top_k=3)
-            # searcher.close() 
             
             if not results:
                 return f"No CDE definition matches found for '{query}'"
@@ -440,7 +437,7 @@ class SemanticNCITDefinitionTool(BaseTool):
             
         except Exception as e:
             return f"Error in semantic NCIT definition search: {str(e)}"
-        finally: # <-- MODIFIED: Added finally block
+        finally:
             if searcher:
                 searcher.close()
     
@@ -462,24 +459,14 @@ def create_fresh_agent():
         temperature=0,
     )
     
-     # adding tools in priority order
     tools = [
-        # Exact match tools (highest priority)
         TermMatcherTool(),
         NodeMatcherTool(),
-        
-        # Fuzzy match tool (for exploration)
         FuzzyTermMatcherTool(),
-        
-        # Synonym tools (medium priority) 
         SynonymFinderTool(),
         SynonymByCodeTool(),
-        
-        # Semantic search tools (fallback)
         SemanticPVSearchTool(),
         SemanticNCITSearchTool(),
-        
-        # Definition-based semantic search (specialized)
         SemanticCDEDefinitionTool(),
         SemanticNCITDefinitionTool()
     ]
@@ -527,6 +514,8 @@ def create_fresh_agent():
     - Only use the provided tools
     - Focus ONLY on the current input
     - Start again if you end up finding nothing
+    
+    - If a high-confidence tool like 'term_matcher' or 'node_matcher' provides a direct hit, you MUST use the 'Final Answer' format immediately and stop. Do not use other tools to "double-check".
     
     You MUST NOT:
     - Make up answers when the database gives no results
