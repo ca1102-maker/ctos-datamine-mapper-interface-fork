@@ -357,34 +357,41 @@ class BackendClient:
                 if center_term.strip():
                     # Neighbourhood query around a term
                     cypher = """
-                    MATCH (start)
-                    WHERE toLower(start.term) CONTAINS toLower($term)
+                     MATCH (start)
+                    WHERE toLower(start.term) CONTAINS toLower($term) OR start.code = $term
                     WITH start LIMIT 1
+                    
                     CALL {
                         WITH start
-                        MATCH path = (start)-[*1..2]-(neighbor)
-                        RETURN neighbor, relationships(path) AS rels
+                        OPTIONAL MATCH path = (start)-[*1..2]-(neighbor)
+                        RETURN path
                         LIMIT $limit
                     }
-                    WITH collect(DISTINCT neighbor) + [start] AS allNodes
+                    
+                    WITH start, collect(path) AS paths
+                    
+                    UNWIND paths AS p
+                    UNWIND relationships(p) AS r
+                    WITH start, collect(DISTINCT r) AS distinctRels
+                    
+                    WITH distinctRels, 
+                         collect(DISTINCT startNode(r)) + collect(DISTINCT endNode(r)) + [start] AS allNodes
+                    
                     UNWIND allNodes AS n
-                    WITH collect(DISTINCT n) AS nodes
-                    UNWIND nodes AS a
-                    UNWIND nodes AS b
-                    WITH a, b, nodes
-                    WHERE id(a) < id(b)
-                    OPTIONAL MATCH (a)-[r]-(b)
-                    WHERE r IS NOT NULL
-                    RETURN
-                        [n IN nodes | {name: COALESCE(n.term, n.code, toString(id(n))),
-                                        type: head(labels(n)),
-                                        code: n.code}] AS nodes,
-                        collect(DISTINCT {
-                            source: COALESCE(a.term, a.code, toString(id(a))),
-                            target: COALESCE(b.term, b.code, toString(id(b))),
+                    WITH distinctRels, collect(DISTINCT n) AS uniqueNodes
+                    
+                    RETURN 
+                        [n IN uniqueNodes | {
+                            name: COALESCE(n.term, n.code, elementId(n)),
+                            type: head(labels(n)),
+                            code: n.code
+                        }] AS nodes,
+                        [r IN distinctRels | {
+                            source: COALESCE(startNode(r).term, startNode(r).code, elementId(startNode(r))),
+                            target: COALESCE(endNode(r).term, endNode(r).code, elementId(endNode(r))),
                             rel_type: type(r)
-                        }) AS edges
-                    """
+                        }] AS edges
+                        """
                     result = session.run(cypher, term=center_term, limit=limit).single()
                 else:
                     # Random sample of connected nodes

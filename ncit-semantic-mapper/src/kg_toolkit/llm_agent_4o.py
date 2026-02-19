@@ -457,6 +457,7 @@ def create_fresh_agent():
     llm = OllamaLLM(
         model="llama3.1-64",
         temperature=0,
+        stop=["Observation:", "Exact match found!"]
     )
     
     tools = [
@@ -515,13 +516,17 @@ def create_fresh_agent():
     - Focus ONLY on the current input
     - Start again if you end up finding nothing
     
-    - If a high-confidence tool like 'term_matcher' or 'node_matcher' provides a direct hit, you MUST use the 'Final Answer' format immediately and stop. Do not use other tools to "double-check".
-    
+
     You MUST NOT:
     - Make up answers when the database gives no results
     - Reference previous queries or results
     - Use action names that aren't actual tools
     
+    STOPPING RULES:
+    - If a high-confidence tool like 'term_matcher' or 'node_matcher' provides a direct hit with a "Code" and "Term", you MUST use the 'Final Answer' format immediately.
+    - Do not use other tools to "double-check" an exact match.
+    - Do NOT output "Action:" or "Action Input:" if you already have the answer in the text above.
+    - Do NOT engage in conversational filler like "It seems like..." or "I will continue...".
     Be thorough but concise in your analysis.
 
     You have access to the following tools:
@@ -530,7 +535,7 @@ def create_fresh_agent():
 
     Use the following format:
 
-    Question: the input question you must answer
+    Questio the input question you must answer
     Thought: you should always think about what to do
     Action: the action to take, should be one of [{tool_names}]
     Action Input: the input to the action
@@ -561,7 +566,7 @@ def create_fresh_agent():
         tools=tools,
         verbose=True,
         handle_parsing_errors=True,
-        max_iterations=10
+        max_iterations=7
     )
     
     return agent_executor, prompt_template
