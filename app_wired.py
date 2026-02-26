@@ -71,6 +71,18 @@ if "chat_messages" not in st.session_state:
     st.session_state.chat_messages = []
 if "settings" not in st.session_state:
     st.session_state.settings = {"dark_mode": False, "notifications": True, "api_endpoint": "https://api.frederick.ai"}
+if "system_prompt" not in st.session_state:
+    st.session_state.system_prompt = (
+        "You are an expert medical data mapper specializing in NCIT (National Cancer Institute Thesaurus) terminology.\n"
+        "Your job is to help map raw medical data values to standardized NCIT terms and codes.\n"
+        "Be thorough but concise in your analysis. Always provide the recommended NCIT code and term if found."
+    )
+if "sme_results" not in st.session_state:
+    st.session_state.sme_results = None
+if "sme_grades" not in st.session_state:
+    st.session_state.sme_grades = {}
+if "graph_query_history" not in st.session_state:
+    st.session_state.graph_query_history = []
 
 # ──────────────────────────────────────────────
 # Backend client (cached singleton)
@@ -85,7 +97,8 @@ client = _init_client()
 # Sidebar
 # ──────────────────────────────────────────────
 PAGES = {
-    "Home": "🏠", "Dashboard": "📊", "Graph Visualization": "🕸️",
+    "Home": "🏠", "Dashboard": "📊", "SME Workbench": "🧪",
+    "Graph Query": "🔍", "Graph Visualization": "🕸️",
     "Performance Metrics": "📈", "File Upload": "📤",
     "Semantic Mapping": "🎯", "Feedback Portal": "💬", "Settings": "⚙️",
 }
@@ -109,6 +122,8 @@ with st.sidebar:
         st.caption(f"Synonym: {'✅' if status['synonym_ready'] else '❌'}")
     with cols[2]:
         st.caption(f"Semantic: {'✅' if status['semantic_ready'] else '❌'}")
+
+    st.caption(f"Ollama LLM: {'✅ Ready' if status.get('ollama_ready') else '⏳ Not tested yet'}")
 
     if not status["agent_ready"]:
         if st.button("🚀 Initialise Agent"):
@@ -191,8 +206,34 @@ def page_home():
     st.markdown("## How can I help you today?")
     st.caption("Ask about semantic mappings, terminology, or explore our features")
 
+    # ── System Prompt Editor (Sprint 11) ──
+    with st.expander("⚙️ Edit System Prompt", expanded=False):
+        st.caption("Customise how the AI agent responds. Changes take effect on the next query.")
+        new_prompt = st.text_area(
+            "System Prompt",
+            value=st.session_state.system_prompt,
+            height=160,
+            key="home_system_prompt_editor",
+            help="This prompt is sent to the LLM agent before every query. Edit it to change the agent's behaviour, focus, or style."
+        )
+        col_save, col_reset, col_spacer = st.columns([1, 1, 4])
+        with col_save:
+            if st.button("💾 Save Prompt", key="save_prompt_home"):
+                st.session_state.system_prompt = new_prompt
+                st.success("System prompt updated!")
+        with col_reset:
+            if st.button("↩️ Reset", key="reset_prompt_home"):
+                st.session_state.system_prompt = (
+                    "You are an expert medical data mapper specializing in NCIT (National Cancer Institute Thesaurus) terminology.\n"
+                    "Your job is to help map raw medical data values to standardized NCIT terms and codes.\n"
+                    "Be thorough but concise in your analysis. Always provide the recommended NCIT code and term if found."
+                )
+                st.rerun()
+
     categories = [
         ("Dashboard", "View metrics and overview"),
+        ("SME Workbench", "Upload terms & grade synonym matches"),
+        ("Graph Query", "Ask questions about the knowledge graph"),
         ("Graph Visualization", "Explore Neo4j knowledge graph"),
         ("Performance Metrics", "Analyze and compare mapping results"),
         ("File Upload", "Upload files to generate mappings"),
@@ -766,6 +807,31 @@ def page_settings():
         st.markdown(f"**{k}:** {'✅' if v is True else ('❌' if v is False else (v or '—'))}")
 
     st.markdown("---")
+
+    # ── System Prompt Editor (Sprint 11) ──
+    st.markdown("##### 🧠 System Prompt")
+    st.caption("This prompt is used by the AI chat agent and the NL-to-Cypher query engine. Changes apply globally.")
+    sys_prompt = st.text_area(
+        "System Prompt",
+        value=st.session_state.system_prompt,
+        height=180,
+        key="settings_system_prompt",
+    )
+    sp_c1, sp_c2, sp_c3 = st.columns([1, 1, 4])
+    with sp_c1:
+        if st.button("💾 Save Prompt", key="settings_save_prompt"):
+            st.session_state.system_prompt = sys_prompt
+            st.success("System prompt saved!")
+    with sp_c2:
+        if st.button("↩️ Reset to Default", key="settings_reset_prompt"):
+            st.session_state.system_prompt = (
+                "You are an expert medical data mapper specializing in NCIT (National Cancer Institute Thesaurus) terminology.\n"
+                "Your job is to help map raw medical data values to standardized NCIT terms and codes.\n"
+                "Be thorough but concise in your analysis. Always provide the recommended NCIT code and term if found."
+            )
+            st.rerun()
+
+    st.markdown("---")
     st.markdown("##### 🌓 Theme")
     settings["dark_mode"] = st.toggle("Dark Mode", value=settings["dark_mode"])
     st.markdown("##### 🔔 Notifications")
@@ -773,9 +839,374 @@ def page_settings():
     st.markdown("##### 🖥️ API Endpoint")
     settings["api_endpoint"] = st.text_input("API Endpoint", value=settings["api_endpoint"])
 
-    if st.button("💾 Save", type="primary"):
+    if st.button("💾 Save Settings", type="primary"):
         st.session_state.settings = settings
         st.success("Settings saved!")
+
+
+# ═════════════════════════════════════════════
+# PAGE: SME Workbench (Sprint 11 — NEW)
+#   Pat's workflow: upload terms → see ranked synonyms → grade them
+# ═════════════════════════════════════════════
+def page_sme_workbench():
+    st.markdown("## 🧪 SME Workbench")
+    st.caption("Upload a list of data terms. The system finds the closest matches in the caDSR/NCIT database. You can then review and grade each match.")
+
+    is_live = client.connected
+
+    if is_live:
+        st.success("🔗 Connected to live Neo4j — results are real", icon="✅")
+    else:
+        st.warning("⚠️ Neo4j offline — showing mock results for demonstration")
+
+    # ── System Prompt (affects how the agent searches) ──
+    with st.expander("⚙️ System Prompt / Search Configuration", expanded=False):
+        st.caption("Optional: Adjust the system prompt that guides how terms are matched.")
+        sme_prompt = st.text_area(
+            "System Prompt",
+            value=st.session_state.system_prompt,
+            height=100,
+            key="sme_system_prompt",
+        )
+        if st.button("💾 Update", key="sme_save_prompt"):
+            st.session_state.system_prompt = sme_prompt
+            st.success("Prompt updated!")
+
+    st.markdown("---")
+
+    # ── Input: File upload OR manual entry ──
+    input_mode = st.radio("Input mode", ["📄 Upload file", "⌨️ Type terms manually"], horizontal=True)
+
+    top_k = st.slider("Top K matches per term", 3, 20, 10, help="How many candidate synonyms to return for each input term")
+
+    terms = []
+
+    if input_mode == "📄 Upload file":
+        uploaded = st.file_uploader(
+            "Upload your terms file (.txt, .csv, or .tsv)",
+            type=["txt", "csv", "tsv"],
+            help="One term per line, comma-separated, or tab-delimited. The first column is treated as the term."
+        )
+        if uploaded:
+            content = uploaded.read().decode("utf-8", errors="replace")
+            # Parse the file (same logic as backend)
+            raw_terms = []
+            if "\t" in content:
+                for line in content.strip().splitlines():
+                    parts = line.split("\t")
+                    t = parts[0].strip()
+                    if t and not t.lower().startswith("term") and not t.startswith("#"):
+                        raw_terms.append(t)
+            elif "," in content.splitlines()[0] if content.strip() else False:
+                for line in content.strip().splitlines():
+                    if line.startswith("#"):
+                        continue
+                    for part in line.split(","):
+                        t = part.strip()
+                        if t and t.lower() not in ("term", "terms", "category", "definition"):
+                            raw_terms.append(t)
+            else:
+                for line in content.strip().splitlines():
+                    t = line.strip()
+                    if t and not t.startswith("#"):
+                        raw_terms.append(t)
+            # Deduplicate
+            seen = set()
+            for t in raw_terms:
+                if t.lower() not in seen:
+                    seen.add(t.lower())
+                    terms.append(t)
+            st.info(f"📋 Parsed **{len(terms)}** unique terms from `{uploaded.name}`")
+            if terms:
+                with st.expander("Preview parsed terms"):
+                    st.write(terms)
+    else:
+        manual_input = st.text_area("Enter terms (one per line or comma-separated)", placeholder="glucose\nhemoglobin\ninsulin\nalbumin", height=120)
+        if manual_input.strip():
+            if "," in manual_input:
+                terms = [t.strip() for t in manual_input.split(",") if t.strip()]
+            else:
+                terms = [t.strip() for t in manual_input.strip().splitlines() if t.strip()]
+
+    # ── Run search ──
+    run = st.button("🔎 Find Matches", type="primary", disabled=not terms)
+
+    if run and terms:
+        all_results = {}
+        progress = st.progress(0, text="Searching...")
+        for i, term in enumerate(terms):
+            progress.progress((i + 1) / len(terms), text=f"Searching: {term}")
+
+            if is_live:
+                # Use the backend client's cascade: exact → fuzzy → synonym path
+                matches = []
+                # Exact
+                exact = client.exact_match_by_term(term)
+                if exact:
+                    matches.append({
+                        "rank": 1, "code": exact.code, "term": exact.term,
+                        "definition": exact.definition, "type": exact.node_type,
+                        "match_method": "exact", "score": 1.0,
+                    })
+                # Fuzzy
+                fuzzy = client.fuzzy_match(term, limit=top_k)
+                for f in fuzzy:
+                    if not any(m["code"] == f.code for m in matches):
+                        matches.append({
+                            "rank": len(matches) + 1, "code": f.code, "term": f.term,
+                            "definition": f.definition, "type": f.node_type,
+                            "match_method": "fuzzy", "score": f.score,
+                        })
+                # Synonym path
+                syns = client.synonyms_by_term(term)
+                for s in syns[:top_k]:
+                    if not any(m["term"] == s for m in matches):
+                        matches.append({
+                            "rank": len(matches) + 1, "code": "", "term": s,
+                            "definition": "", "type": "SYN",
+                            "match_method": "synonym_path", "score": 0.7,
+                        })
+                # Re-rank
+                matches.sort(key=lambda x: x["score"], reverse=True)
+                for idx, m in enumerate(matches):
+                    m["rank"] = idx + 1
+                all_results[term] = matches[:top_k]
+            else:
+                # Mock
+                all_results[term] = [
+                    {
+                        "rank": j + 1,
+                        "code": f"C{10000 + abs(hash(term + str(j))) % 90000}",
+                        "term": f"Mock match {j+1} for {term}",
+                        "definition": f"Simulated definition for a match of '{term}'.",
+                        "type": "NCIT", "match_method": "mock",
+                        "score": round(0.95 - j * 0.08, 3),
+                    }
+                    for j in range(min(top_k, 5))
+                ]
+        progress.empty()
+        st.session_state.sme_results = all_results
+
+    # ── Display results with grading UI ──
+    if st.session_state.sme_results:
+        results = st.session_state.sme_results
+        st.markdown("---")
+        st.markdown(f"### Results ({len(results)} terms)")
+
+        # Export all results as CSV
+        export_rows = []
+        for input_term, matches in results.items():
+            for m in matches:
+                export_rows.append({
+                    "Input Term": input_term,
+                    "Rank": m["rank"],
+                    "Code": m["code"],
+                    "Matched Term": m["term"],
+                    "Definition": m["definition"],
+                    "Type": m["type"],
+                    "Method": m["match_method"],
+                    "Score": m["score"],
+                    "SME Grade": st.session_state.sme_grades.get(f"{input_term}|{m['code']}|{m['term']}", ""),
+                })
+        export_df = pd.DataFrame(export_rows)
+        st.download_button("📥 Export all results as CSV", export_df.to_csv(index=False), "sme_workbench_results.csv", "text/csv")
+
+        # Per-term accordion with grading table
+        for input_term, matches in results.items():
+            with st.expander(f"🔬 **{input_term}** — {len(matches)} matches", expanded=True):
+                if not matches:
+                    st.caption("No matches found.")
+                    continue
+
+                # Build an editable dataframe for this term
+                rows = []
+                for m in matches:
+                    grade_key = f"{input_term}|{m['code']}|{m['term']}"
+                    rows.append({
+                        "Rank": m["rank"],
+                        "Code": m["code"],
+                        "Term": m["term"],
+                        "Definition": m["definition"][:100] + ("..." if len(m["definition"]) > 100 else ""),
+                        "Method": m["match_method"],
+                        "Score": m["score"],
+                        "Grade": st.session_state.sme_grades.get(grade_key, "—"),
+                })
+
+                df = pd.DataFrame(rows)
+                st.dataframe(df, use_container_width=True, hide_index=True)
+
+                # Grading controls
+                st.caption("**Grade the best match:**")
+                grade_cols = st.columns(min(len(matches), 5))
+                for j, m in enumerate(matches[:5]):
+                    with grade_cols[j % 5]:
+                        grade_key = f"{input_term}|{m['code']}|{m['term']}"
+                        current = st.session_state.sme_grades.get(grade_key, "—")
+                        label = f"#{m['rank']} {m['term'][:20]}"
+                        grade = st.selectbox(
+                            label,
+                            ["—", "✅ Accept", "🤔 Maybe", "❌ Reject"],
+                            index=["—", "✅ Accept", "🤔 Maybe", "❌ Reject"].index(current) if current in ["—", "✅ Accept", "🤔 Maybe", "❌ Reject"] else 0,
+                            key=f"grade_{grade_key}",
+                        )
+                        if grade != "—":
+                            st.session_state.sme_grades[grade_key] = grade
+
+        # Summary of grades
+        if st.session_state.sme_grades:
+            st.markdown("---")
+            st.markdown("### 📊 Grading Summary")
+            grade_counts = {"✅ Accept": 0, "🤔 Maybe": 0, "❌ Reject": 0}
+            for g in st.session_state.sme_grades.values():
+                if g in grade_counts:
+                    grade_counts[g] += 1
+            gc1, gc2, gc3 = st.columns(3)
+            with gc1:
+                st.metric("Accepted", grade_counts["✅ Accept"])
+            with gc2:
+                st.metric("Maybe", grade_counts["🤔 Maybe"])
+            with gc3:
+                st.metric("Rejected", grade_counts["❌ Reject"])
+
+
+# ═════════════════════════════════════════════
+# PAGE: Graph Query (Sprint 11 — NEW)
+#   Natural language → Ollama → Cypher → Neo4j results
+# ═════════════════════════════════════════════
+def page_graph_query():
+    st.markdown("## 🔍 Graph Query (Natural Language)")
+    st.caption("Ask questions about the knowledge graph in plain English. The system uses Ollama to convert your question into a Cypher query and runs it against Neo4j.")
+
+    is_live = client.connected
+
+    # ── Status badges ──
+    status_cols = st.columns(3)
+    with status_cols[0]:
+        if is_live:
+            st.success("Neo4j: Connected", icon="✅")
+        else:
+            st.error("Neo4j: Offline", icon="❌")
+    with status_cols[1]:
+        # Probe Ollama on first visit
+        ollama_ok = client.ollama_ready
+        if ollama_ok:
+            st.success("Ollama: Connected", icon="🤖")
+        else:
+            st.warning("Ollama: Offline (using pattern fallback)", icon="⚠️")
+    with status_cols[2]:
+        st.info("Queries generated & executed live", icon="🔍")
+
+    # ── System Prompt (editable) ──
+    with st.expander("⚙️ NL-to-Cypher System Prompt", expanded=False):
+        st.caption(
+            "This prompt is sent to Ollama before your question. "
+            "It teaches the LLM the graph schema and how to write Cypher. "
+            "Edit it to change behaviour or add domain-specific hints."
+        )
+        nl_prompt = st.text_area(
+            "Prompt",
+            value=st.session_state.get("_nl_prompt", client.GRAPH_SCHEMA_PROMPT),
+            height=200,
+            key="nl_cypher_prompt",
+        )
+        prc1, prc2 = st.columns([1, 5])
+        with prc1:
+            if st.button("💾 Save", key="save_nl_prompt"):
+                st.session_state["_nl_prompt"] = nl_prompt
+                st.success("Prompt saved for this session!")
+        with prc2:
+            if st.button("↩️ Reset", key="reset_nl_prompt"):
+                st.session_state["_nl_prompt"] = client.GRAPH_SCHEMA_PROMPT
+                st.rerun()
+
+    st.markdown("---")
+
+    # ── Example questions ──
+    st.markdown("**Try these examples:**")
+    examples = [
+        "How many synonyms are there for C1234?",
+        "Show me all synonyms for 'Lung Carcinoma'",
+        "What CDEs use the concept C4878?",
+        "Find permissible values related to prostate",
+        "List NCIT concepts with 'diabetes' in the name",
+    ]
+    ex_cols = st.columns(len(examples))
+    for i, ex in enumerate(examples):
+        with ex_cols[i]:
+            if st.button(f"💡 {ex[:30]}...", key=f"ex_{i}", use_container_width=True):
+                st.session_state["_gq_question"] = ex
+                st.rerun()
+
+    # ── Question input ──
+    question = st.text_input(
+        "Your question",
+        value=st.session_state.get("_gq_question", ""),
+        placeholder="e.g. How many synonyms are there for C1234?",
+        key="graph_query_input",
+    )
+
+    run_query = st.button("🚀 Run Query", type="primary", disabled=not question.strip())
+
+    if run_query and question.strip():
+        with st.spinner("Generating Cypher via Ollama and querying Neo4j..."):
+            prompt_to_use = st.session_state.get("_nl_prompt", None)
+            result = client.nl_to_cypher(question, system_prompt=prompt_to_use)
+
+        # Store in history
+        st.session_state.graph_query_history.insert(0, result)
+        # Clear the prefilled question
+        if "_gq_question" in st.session_state:
+            del st.session_state["_gq_question"]
+
+    # ── Display latest result ──
+    if st.session_state.graph_query_history:
+        latest = st.session_state.graph_query_history[0]
+
+        st.markdown("---")
+
+        # Method badge
+        if latest["method"] == "ollama":
+            st.success("🤖 Cypher generated by **Ollama LLM**")
+        else:
+            st.info("🔧 Cypher generated by **pattern-based fallback** (Ollama unavailable)")
+
+        st.markdown("##### Generated Cypher Query")
+        st.code(latest["cypher"], language="cypher")
+
+        if latest.get("error"):
+            st.warning(f"⚠️ {latest['error']}")
+
+        if latest["results"]:
+            st.markdown(f"##### Results ({latest['total']} rows)")
+            df = pd.DataFrame(latest["results"])
+            st.dataframe(df, use_container_width=True, hide_index=True)
+            st.download_button("📥 Export CSV", df.to_csv(index=False), "graph_query_results.csv", "text/csv")
+        elif not latest.get("error"):
+            st.info("No results returned.")
+
+        # ── Manual edit & re-run ──
+        with st.expander("✏️ Edit & re-run Cypher manually"):
+            edited = st.text_area("Cypher", value=latest["cypher"], height=100, key="edit_cypher")
+            if st.button("▶️ Execute edited query", key="rerun_edited"):
+                with st.spinner("Running..."):
+                    rows = client.run_cypher(edited)
+                if rows:
+                    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+                else:
+                    st.info("No results (or Neo4j offline)")
+
+    # ── Query history ──
+    if len(st.session_state.graph_query_history) > 1:
+        with st.expander(f"📜 Query History ({len(st.session_state.graph_query_history)} queries)"):
+            for i, h in enumerate(st.session_state.graph_query_history):
+                method_icon = "🤖" if h["method"] == "ollama" else "🔧"
+                st.markdown(f"**{i+1}.** {method_icon} {h['question']}")
+                st.code(h["cypher"], language="cypher")
+                if h["results"]:
+                    st.caption(f"→ {h['total']} results")
+                if h.get("error"):
+                    st.caption(f"⚠️ {h['error']}")
+                st.markdown("---")
 
 
 # ──────────────────────────────────────────────
@@ -784,6 +1215,8 @@ def page_settings():
 page = st.session_state.page
 if page == "Home": page_home()
 elif page == "Dashboard": page_dashboard()
+elif page == "SME Workbench": page_sme_workbench()
+elif page == "Graph Query": page_graph_query()
 elif page == "Semantic Mapping": page_semantic_mapping()
 elif page == "Graph Visualization": page_graph()
 elif page == "File Upload": page_file_upload()
