@@ -1,16 +1,63 @@
-# How to Run the Server Locally Using Anvil
+# Frederick Platform
 
-## Disclaimer
-Our current working directory is react-frontend. As Meky demonstrated during the meeting two weeks ago, the frontend UI has been improved significantly. We are currently in the process of integrating the Neo4j database, which represents the first major step in this phase of development.
+Medical terminology mapping platform built on Neo4j, Streamlit, and LangChain.
+Maps raw clinical data terms to standardized NCIT/caDSR terminology via exact,
+fuzzy, and semantic search.
 
-* Before proceeding with the integration, follow the step-by-step instructions below to launch the application locally. *
+## Project structure
 
-1. Navigate to the Anvil dashboard (https://ondemand.anvil.rcac.purdue.edu/pun/sys/dashboard), then go to My Interactive Sessions.
+```
+frederick/
+├── app/
+│   ├── main.py                  # Streamlit entrypoint + router + sidebar
+│   ├── styles.py                # All shared CSS
+│   ├── pages/                   # One file per page
+│   │   ├── home.py              # Chat + quick nav
+│   │   ├── map_and_grade.py     # Batch mapping + inline SME grading (Sprint 12)
+│   │   ├── graph_explore.py     # Graph Query + Visualization (merged)
+│   │   ├── ingest.py            # EVS file upload → Neo4j ingestion
+│   │   ├── dashboard.py         # KPI overview
+│   │   └── settings.py          # Connection info, system prompt, preferences
+│   ├── components/
+│   │   └── sidebar.py           # Sidebar: status, model config, nav
+│   └── services/
+│       ├── neo4j_client.py      # BackendClient (Neo4j + kg_toolkit)
+│       └── models.py            # MatchResult, GraphPayload dataclasses
+├── assets/
+│   ├── icon.png
+│   └── logo.png
+├── config/
+│   └── eg.env                   # Example .env
+├── ncit-semantic-mapper/        # kg_toolkit library (git submodule)
+├── si-tamer/                    # si_tamer library (git submodule)
+├── requirements.txt             # Python deps for the Streamlit app
+└── README.md
+```
 
-2. Set up and launch a virtual machine environment. This session typically provides approximately 1.5 hours of access.
+## Quickstart (Anvil)
 
-3. Once the environment is running, complete the login process to GitHub.
+```bash
+# 1. Clone & enter
+cd /path/to/frederick
 
-4. Install the required dependencies by following the standard npm setup steps (e.g., npm install). Ensure that Node.js is updated so the environment matches the expected configuration.
+# 2. Copy env and fill in credentials
+cp config/eg.env .env
 
-5. Launch the application using npm run dev. You should now be able to see the server running locally. This avoids the proxy-related blocking behavior encountered when running the app through Jupyter Notebook.
+# 3. Install deps
+pip install -r requirements.txt
+
+# 4. Ensure ncit-semantic-mapper is on PYTHONPATH
+export PYTHONPATH=$PYTHONPATH:$(pwd)/ncit-semantic-mapper/src
+
+# 5. Run
+streamlit run app/main.py
+```
+
+## Key changes from Sprint 11 → Sprint 12
+
+- **Merged Semantic Mapping + SME Workbench** into a single "Map & Grade" page
+  with batch CSV upload, table-view results, and inline grading.
+- **Merged Graph Query + Graph Visualization** into a single "Explore Graph" page.
+- **Restructured** the monolithic `app_wired.py` (1350 lines) into focused modules.
+- **Removed** dead code: `frontend/` (old React mock), `backend/` (unused FastAPI
+  scaffold), duplicate Streamlit files (`streamlit_old.py`, `streamlitlog.py`, etc.).
