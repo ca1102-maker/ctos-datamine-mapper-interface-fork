@@ -1,0 +1,11 @@
+# Frederick Platform — Python dependencies
+streamlit>=1.30.0
+plotly>=5.18.0
+pandas>=2.1.0
+numpy>=1.24.0
+python-dotenv>=1.0.0
+neo4j>=5.14.0
+
+# Optional — required only when using LLM features
+# langchain-ollama>=0.1.0
+# langchain>=0.2.0
