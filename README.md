@@ -43,7 +43,7 @@ The project is organized into several modular components:
     pip install -r requirements.txt
 
 ## 🖥 Usage
-Run the Streamlit application to start the mapping interface:
+Run the Streamlit application to start the mapping interface:  
     ```bash
     streamlit run app_wired.py
 
