@@ -42,26 +42,20 @@ The project is organized into several modular components:
     ```bash
     pip install -r requirements.txt
 
-3. **Configure Environment:**
-    Create a .env file in the root directory:
-    NEO4J_URI=bolt://localhost:7687
-    NEO4J_USER=neo4j
-    NEO4J_PASSWORD=your_password
-    LLM_API_KEY=your_api_key
-
 ## 🖥 Usage
-    Run the Streamlit application to start the mapping interface:
+Run the Streamlit application to start the mapping interface:
     ```bash
     streamlit run app_wired.py
 
+
 ## 📂 Project Structure
-    .
-├── app_wired.py            # Streamlit Frontend
-├── backend_client.py       # Logic Orchestration
-├── ncit_semantic_mapper/   # Exact/Fuzzy/Semantic Match logic
-├── si_tamer/               # SI Unit normalization
-├── backend/                # API & Core Services
-└── frontend/               # UI Assets
+
+├── app_wired.py            # Streamlit Frontend  
+├── backend_client.py       # Logic Orchestration  
+├── ncit_semantic_mapper/   # Exact/Fuzzy/Semantic Match logic  
+├── si_tamer/               # SI Unit normalization  
+├── backend/                # API & Core Services  
+└── frontend/               # UI Assets  
 
 
 
