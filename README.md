@@ -31,7 +31,7 @@ The project is organized into several modular components:
 ### Prerequisites
 - Python 3.9+
 - Neo4j Database (populated with NCIT data)
-- LLM API Key (OpenAI, Anthropic, or Local)
+- LLM API Key
 
 ### Installation
 1. **Clone the repository:**
@@ -50,12 +50,12 @@ The project is organized into several modular components:
 
 ## 📂 Project Structure
 
-├── app_wired.py            # Streamlit Frontend  
-├── backend_client.py       # Logic Orchestration  
-├── ncit_semantic_mapper/   # Exact/Fuzzy/Semantic Match logic  
-├── si_tamer/               # SI Unit normalization  
-├── backend/                # API & Core Services  
-└── frontend/               # UI Assets  
+├── app_wired.py             
+├── backend_client.py         
+├── ncit_semantic_mapper/     
+├── si_tamer/                
+├── backend/                   
+└── frontend/                  
 
 
 
