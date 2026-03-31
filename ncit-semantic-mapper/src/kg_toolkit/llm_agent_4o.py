@@ -449,30 +449,21 @@ class SemanticNCITDefinitionTool(BaseTool):
         return self._run(query, run_manager=run_manager.get_sync() if run_manager else None)
 
 
-def create_fresh_agent():
-    """Create and configure the LangChain agent"""
-    
+def create_fresh_agent(model_name="llama3.1-64"):
     Config.validate()
     
     llm = OllamaLLM(
-        model="llama3.1-64",
+        model=model_name,
         temperature=0,
-        stop=["Observation:", "Exact match found!"]
+        stop=["\nObservation:", "Observation:"] 
     )
     
-    tools = [
-        TermMatcherTool(),
-        NodeMatcherTool(),
-        FuzzyTermMatcherTool(),
-        SynonymFinderTool(),
-        SynonymByCodeTool(),
-        SemanticPVSearchTool(),
-        SemanticNCITSearchTool(),
-        SemanticCDEDefinitionTool(),
-        SemanticNCITDefinitionTool()
+    tools =[
+        TermMatcherTool(), NodeMatcherTool(), FuzzyTermMatcherTool(),
+        SynonymFinderTool(), SynonymByCodeTool(), SemanticPVSearchTool(),
+        SemanticNCITSearchTool(), SemanticCDEDefinitionTool(), SemanticNCITDefinitionTool()
     ]
     
-    # Create the prompt template for ReAct agent
     prompt_template = """
     You are an expert medical data mapper specializing in NCIT (National Cancer Institute Thesaurus) terminology.
     Your job is to help map raw medical data values to standardized NCIT terms and codes. 
@@ -557,23 +548,21 @@ def create_fresh_agent():
                           "tool_names": ", ".join([tool.name for tool in tools])}
     )
     
-    # Create the ReAct agent
     agent = create_react_agent(llm, tools, prompt)
     
-    # Create agent executor
+    # --- CRITICAL FIX: Lower max_iterations and use early_stopping ---
     agent_executor = AgentExecutor(
         agent=agent,
         tools=tools,
         verbose=True,
         handle_parsing_errors=True,
-        max_iterations=7
+        max_iterations=5, 
+        early_stopping_method="generate"
     )
     
     return agent_executor, prompt_template
 
 def map_raw_data_isolated(agent_executor, system_prompt, raw_value):
-    """Map a raw data value to NCIT terminology"""
-    
     try:
         response = agent_executor.invoke({"input": f"Raw medical data value to map: \"{raw_value}\""})
         return response["output"]

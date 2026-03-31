@@ -1,61 +1,63 @@
-# LLM-Based Mapping Tool for Biomedical Research Data
+# Frederick Platform
 
-A specialized platform for harmonizing biomedical research terms with the **National Cancer Institute Thesaurus (NCIT)**. This tool uses a multi-layered approach—combining deterministic matching with LLM-driven semantic search—to map complex clinical data to standardized ontologies.
+Medical terminology mapping platform built on Neo4j, Streamlit, and LangChain.
+Maps raw clinical data terms to standardized NCIT/caDSR terminology via exact,
+fuzzy, and semantic search.
 
-## 🚀 Overview
+## Project structure
 
-The system bridges the gap between raw biomedical datasets and standardized terminologies. By utilizing a **Neo4j graph database** and Large Language Models, it provides a high-precision mapping interface that understands the context and hierarchy of biomedical concepts.
+```
+frederick/
+├── app/
+│   ├── main.py                  # Streamlit entrypoint + router + sidebar
+│   ├── styles.py                # All shared CSS
+│   ├── pages/                   # One file per page
+│   │   ├── home.py              # Chat + quick nav
+│   │   ├── map_and_grade.py     # Batch mapping + inline SME grading (Sprint 12)
+│   │   ├── graph_explore.py     # Graph Query + Visualization (merged)
+│   │   ├── ingest.py            # EVS file upload → Neo4j ingestion
+│   │   ├── dashboard.py         # KPI overview
+│   │   └── settings.py          # Connection info, system prompt, preferences
+│   ├── components/
+│   │   └── sidebar.py           # Sidebar: status, model config, nav
+│   └── services/
+│       ├── neo4j_client.py      # BackendClient (Neo4j + kg_toolkit)
+│       └── models.py            # MatchResult, GraphPayload dataclasses
+├── assets/
+│   ├── icon.png
+│   └── logo.png
+├── config/
+│   └── eg.env                   # Example .env
+├── ncit-semantic-mapper/        # kg_toolkit library (git submodule)
+├── si-tamer/                    # si_tamer library (git submodule)
+├── requirements.txt             # Python deps for the Streamlit app
+└── README.md
+```
 
-## 🏗 Architecture & Components
+## Quickstart (Anvil)
 
-The project is organized into several modular components:
+```bash
+# 1. Clone & enter
+cd /path/to/frederick
 
-*   **`app_wired.py`**: The main entry point. A **Streamlit** dashboard providing an interactive UI for researchers.
-*   **`backend_client.py`**: The orchestration layer that connects the frontend to mapping services and the database.
-*   **`ncit_semantic_mapper/`**: The core logic engine, featuring:
-    *   **Exact Match**: Fast, string-perfect lookups.
-    *   **Fuzzy Match**: Similarity-based matching to handle typos and minor variations.
-    *   **Semantic Search**: Natural language search powered by **LLMs** and **Neo4j** graph embeddings.
-*   **`si_tamer/`**: A specialized utility for normalizing SI units and numerical data within biomedical contexts.
-*   **`frontend/` & `backend/`**: Modular directories for API development and extended UI components.
+# 2. Copy env and fill in credentials
+cp config/eg.env .env
 
-## 🛠 Features
+# 3. Install deps
+pip install -r requirements.txt
 
-- **Natural Language Mapping**: Search for terms using plain English; the LLM interprets intent and maps it to the closest NCIT concept.
-- **Graph-Powered Context**: Leverages Neo4j to navigate the hierarchical relationships within the NCIT ontology.
-- **Hybrid Search Pipeline**: Falls back from Exact → Fuzzy → Semantic to ensure the most accurate result is always found.
-- **Streamlit Integration**: Real-time visualization of mapping results and similarity scores.
+# 4. Ensure ncit-semantic-mapper is on PYTHONPATH
+export PYTHONPATH=$PYTHONPATH:$(pwd)/ncit-semantic-mapper/src
 
-## 📦 Getting Started
+# 5. Run
+streamlit run app/main.py
+```
 
-### Prerequisites
-- Python 3.9+
-- Neo4j Database (populated with NCIT data)
-- LLM API Key
+## Key changes from Sprint 11 → Sprint 12
 
-### Installation
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/TheDataMine/f2025_s2026_wl_fnl_userinterface
-
-2. **Install dependencies:**
-    ```bash
-    pip install -r requirements.txt
-
-## 🖥 Usage
-3. **Run the Streamlit application to start the mapping interface:**  
-    ```bash  
-    streamlit run app_wired.py
-
-
-## 📂 Project Structure
-
-├── app_wired.py             
-├── backend_client.py         
-├── ncit_semantic_mapper/     
-├── si_tamer/                
-├── backend/                   
-└── frontend/                  
-
-
-
+- **Merged Semantic Mapping + SME Workbench** into a single "Map & Grade" page
+  with batch CSV upload, table-view results, and inline grading.
+- **Merged Graph Query + Graph Visualization** into a single "Explore Graph" page.
+- **Restructured** the monolithic `app_wired.py` (1350 lines) into focused modules.
+- **Removed** dead code: `frontend/` (old React mock), `backend/` (unused FastAPI
+  scaffold), duplicate Streamlit files (`streamlit_old.py`, `streamlitlog.py`, etc.).
