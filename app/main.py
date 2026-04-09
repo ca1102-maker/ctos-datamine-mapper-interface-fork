@@ -16,6 +16,7 @@ st.set_page_config(
 from app.styles import GLOBAL_CSS
 from app.services.neo4j_client import get_client
 from app.components.sidebar import render_sidebar
+from app.views.login import page_login
 from app.views.home import page_home
 from app.views.map_and_grade import page_map_and_grade
 from app.views.graph_explore import page_graph_explore
@@ -51,6 +52,14 @@ if "system_prompt" not in st.session_state:
 if "graph_query_history" not in st.session_state:
     st.session_state.graph_query_history = []
 
+# ── Auth state defaults ──
+if "logged_in_user_id" not in st.session_state:
+    st.session_state.logged_in_user_id = None
+if "logged_in_username" not in st.session_state:
+    st.session_state.logged_in_username = None
+if "logged_in_display_name" not in st.session_state:
+    st.session_state.logged_in_display_name = None
+
 # ── Backend client (cached singleton) ──
 @st.cache_resource
 def _init_client():
@@ -58,31 +67,35 @@ def _init_client():
 
 client = _init_client()
 
-# ── Sidebar ──
-render_sidebar(client)
-
-# ── Router ──
-page = st.session_state.page
-
-if page == "Home":
-    page_home(client)
-elif page == "Map & Grade":
-    page_map_and_grade(client)
-elif page == "Explore Graph":
-    page_graph_explore(client)
-elif page == "Dashboard":
-    page_dashboard(client)
-elif page == "Ingest Data":
-    page_ingest(client)
-elif page == "Settings":
-    page_settings(client)
-elif page == "Benchmark":
-    page_benchmark(client)
+# ── Auth gate: show login page or the full app ──
+if not st.session_state.logged_in_user_id:
+    page_login(client)
 else:
-    st.error(f"Unknown page: {page}")
-    st.session_state.page = "Home"
-    st.rerun()
+    # ── Sidebar ──
+    render_sidebar(client)
 
-# ── Footer ──
-st.markdown("---")
-st.caption("Frederick Platform v2.0.0 | Powered by Neo4j & LangChain | © 2025 Frederick AI")
+    # ── Router ──
+    page = st.session_state.page
+
+    if page == "Home":
+        page_home(client)
+    elif page == "Map & Grade":
+        page_map_and_grade(client)
+    elif page == "Explore Graph":
+        page_graph_explore(client)
+    elif page == "Dashboard":
+        page_dashboard(client)
+    elif page == "Ingest Data":
+        page_ingest(client)
+    elif page == "Settings":
+        page_settings(client)
+    elif page == "Benchmark":
+        page_benchmark(client)
+    else:
+        st.error(f"Unknown page: {page}")
+        st.session_state.page = "Home"
+        st.rerun()
+
+    # ── Footer ──
+    st.markdown("---")
+    st.caption("Frederick Platform v2.0.0 | Powered by Neo4j & LangChain | © 2025 Frederick AI")

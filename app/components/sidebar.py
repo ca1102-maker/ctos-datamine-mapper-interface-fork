@@ -43,6 +43,11 @@ def render_sidebar(client: BackendClient):
     with st.sidebar:
         st.markdown("### 🧬 Frederick Platform")
 
+        # ── Logged-in user ──
+        display_name = st.session_state.get("logged_in_display_name", "")
+        if display_name:
+            st.markdown(f"👤 **{display_name}**")
+
         # ── Backend status ──
         status = client.status_dict()
         if status["neo4j_connected"]:
@@ -108,7 +113,7 @@ def render_sidebar(client: BackendClient):
         if client.agent_ready:
             st.caption(f"Agent: 🟢 {client.current_agent_model}")
         else:
-            st.caption(f"Agent: 🔴 Failed — using Claude/mock fallback")
+            st.caption("Agent: 🔴 Failed — using Claude/mock fallback")
 
         st.markdown("---")
 
@@ -125,4 +130,14 @@ def render_sidebar(client: BackendClient):
                 ):
                     st.session_state.page = page_name
                     st.rerun()
-            st.markdown("")
+            st.markdown("")  # spacer between groups
+
+        # ── Logout ──
+        st.markdown("---")
+        if st.button("🚪 Log Out", key="logout_btn", use_container_width=True):
+            for key in [
+                "logged_in_user_id", "logged_in_username", "logged_in_display_name",
+                "current_chat_id", "chat_messages", "chat_sessions",
+            ]:
+                st.session_state.pop(key, None)
+            st.rerun()
