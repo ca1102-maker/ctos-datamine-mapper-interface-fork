@@ -110,7 +110,7 @@ frederick/
 
 ```bash
 git clone <repo-url>
-cd frederick
+cd f2025_s2026_wl_fnl_userinterface
 ```
 
 ### 2. Set up environment variables
