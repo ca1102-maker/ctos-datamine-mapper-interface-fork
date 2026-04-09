@@ -130,7 +130,7 @@ pip install -r requirements.txt
 
 ### 4. Set up Ollama (one-time, optional)
 
-Request a 16-core allocation on Anvil, then:
+Request a high computer server (e.g. DatamineMAX VSCode 128 cores), could potentially run on smaller datamine 16 node session, but VERY slowly
 
 ```bash
 chmod +x ollama_setup.sh
