@@ -142,8 +142,7 @@ This symlinks model storage to `$SCRATCH`, pulls models (`qwen3`, `nomic-embed-t
 ### 5. Run the app
 
 ```bash
-export PYTHONPATH=$PYTHONPATH:$(pwd)/ncit-semantic-mapper/src
-streamlit run app/main.py
+./run.sh
 ```
 
 The app opens with a login page. Create an account to get started — your chat history will be saved to your account in Neo4j.
