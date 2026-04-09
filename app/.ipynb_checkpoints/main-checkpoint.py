@@ -22,6 +22,7 @@ from app.views.graph_explore import page_graph_explore
 from app.views.dashboard import page_dashboard
 from app.views.ingest import page_ingest
 from app.views.settings import page_settings
+from app.views.benchmark import page_benchmark
 
 # ── Global CSS ──
 st.markdown(GLOBAL_CSS, unsafe_allow_html=True)
@@ -75,6 +76,8 @@ elif page == "Ingest Data":
     page_ingest(client)
 elif page == "Settings":
     page_settings(client)
+elif page == "Benchmark":
+    page_benchmark(client)
 else:
     st.error(f"Unknown page: {page}")
     st.session_state.page = "Home"

@@ -454,8 +454,7 @@ def create_fresh_agent(model_name="llama3.1-64"):
     
     llm = OllamaLLM(
         model=model_name,
-        temperature=0,
-        stop=["\nObservation:", "Observation:"] 
+        temperature=0
     )
     
     tools =[

@@ -1,10 +1,10 @@
-"""Sidebar: backend status, model config, navigation."""
+"""Sidebar: backend status, model config with Ollama model discovery, navigation."""
 
 import streamlit as st
+import requests
 from app.services.neo4j_client import BackendClient
 
 
-# Grouped navigation: primary workflows first, admin second
 NAV_GROUPS = {
     "Workflows": {
         "Home": "🏠",
@@ -14,13 +14,32 @@ NAV_GROUPS = {
     "Admin": {
         "Dashboard": "📊",
         "Ingest Data": "📤",
+        "Benchmark": "🏆",
         "Settings": "⚙️",
     },
 }
 
+# Default fallback list if Ollama API is unreachable
+FALLBACK_MODELS = ["llama3.1-64", "llama3.1", "qwen2.5", "mistral", "codellama"]
+
+
+def _fetch_ollama_models() -> list[str]:
+    """Query the Ollama API for locally installed models."""
+    if "ollama_models" in st.session_state:
+        return st.session_state["ollama_models"]
+    try:
+        resp = requests.get("http://localhost:11434/api/tags", timeout=3)
+        resp.raise_for_status()
+        models = [m["name"] for m in resp.json().get("models", [])]
+        models.sort()
+        st.session_state["ollama_models"] = models if models else FALLBACK_MODELS
+    except Exception:
+        st.session_state["ollama_models"] = FALLBACK_MODELS
+    return st.session_state["ollama_models"]
+
 
 def render_sidebar(client: BackendClient):
-    """Render the full sidebar and return the selected page name."""
+    """Render the full sidebar."""
     with st.sidebar:
         st.markdown("### 🧬 Frederick Platform")
 
@@ -48,30 +67,48 @@ def render_sidebar(client: BackendClient):
 
         # ── Model configuration ──
         st.markdown("**🧠 Model Configuration**")
-        agent_model = st.text_input(
+
+        available_models = _fetch_ollama_models()
+
+        # Agent model selector
+        default_agent = st.session_state.get("agent_model", "llama3.1-64")
+        agent_idx = available_models.index(default_agent) if default_agent in available_models else 0
+        agent_model = st.selectbox(
             "Reasoning Model (Agent)",
-            value=st.session_state.get("agent_model", "llama3.1"),
-            help="e.g., qwen2.5, llama3.1-64",
+            available_models,
+            index=agent_idx,
+            help="Select which locally installed Ollama model to use for the chat agent.",
         )
-        cypher_model = st.text_input(
+
+        # Cypher model selector
+        default_cypher = st.session_state.get("cypher_model", "llama3.1-64")
+        cypher_idx = available_models.index(default_cypher) if default_cypher in available_models else 0
+        cypher_model = st.selectbox(
             "Cypher Gen Model (Fast)",
-            value=st.session_state.get("cypher_model", "llama3.1"),
-            help="Used for Natural Language to Cypher",
+            available_models,
+            index=cypher_idx,
+            help="Select which model to use for Natural Language to Cypher generation.",
         )
+
         st.session_state["agent_model"] = agent_model
         st.session_state["cypher_model"] = cypher_model
 
-        if st.button("🚀 Initialize / Swap Agent", use_container_width=True):
-            with st.spinner(f"Loading {agent_model} into memory..."):
-                ok = client.init_agent(model_name=agent_model)
-                if ok:
-                    st.success(f"Agent ready using {agent_model}!")
-                else:
-                    st.error(f"Agent failed: {client.error}")
+        # Refresh model list button
+        if st.button("🔄 Refresh models", use_container_width=True):
+            if "ollama_models" in st.session_state:
+                del st.session_state["ollama_models"]
+            st.rerun()
 
-        current_model = getattr(client, "current_agent_model", "unknown")
-        agent_status = f"🟢 Ready ({current_model})" if status["agent_ready"] else "🔴 Not Initialized"
-        st.write(f"Agent Status: **{agent_status}**")
+        # Swap agent if model changed or not yet initialized
+        current_model = getattr(client, "current_agent_model", None)
+        if not status["agent_ready"] or current_model != agent_model:
+            with st.spinner(f"Loading {agent_model}..."):
+                client.init_agent(model_name=agent_model)
+
+        if client.agent_ready:
+            st.caption(f"Agent: 🟢 {client.current_agent_model}")
+        else:
+            st.caption(f"Agent: 🔴 Failed — using Claude/mock fallback")
 
         st.markdown("---")
 
@@ -88,4 +125,4 @@ def render_sidebar(client: BackendClient):
                 ):
                     st.session_state.page = page_name
                     st.rerun()
-            st.markdown("")  # spacer between groups
+            st.markdown("")

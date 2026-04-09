@@ -488,20 +488,93 @@ class BackendClient:
         except Exception as e:
             return {"ok": False, "error": str(e)}
 
+    # ── User Authentication (Neo4j) ──────────────────────────────────────
+
+    @staticmethod
+    def _hash_password(password: str, salt: str = None) -> tuple[str, str]:
+        """Hash a password with a random salt. Returns (hash_hex, salt_hex)."""
+        if salt is None:
+            salt = uuid.uuid4().hex
+        salted = (salt + password).encode("utf-8")
+        hashed = hashlib.sha256(salted).hexdigest()
+        return hashed, salt
+
+    def create_user(self, username: str, password: str, display_name: str = "") -> dict:
+        """Create a new PlatformUser node. Returns {ok, user_id, error}."""
+        if not self._driver:
+            return {"ok": False, "user_id": None, "error": "Neo4j not connected"}
+        # Check for duplicate username
+        existing = self.run_cypher(
+            "MATCH (u:PlatformUser {username: $username}) RETURN u.user_id AS uid LIMIT 1",
+            {"username": username.strip().lower()},
+        )
+        if existing:
+            return {"ok": False, "user_id": None, "error": "Username already exists"}
+
+        user_id = f"user:{uuid.uuid4().hex[:12]}"
+        pw_hash, salt = self._hash_password(password)
+        now = datetime.utcnow().isoformat()
+        result = self.write_cypher(
+            """CREATE (u:PlatformUser {
+                user_id: $user_id, username: $username,
+                display_name: $display_name,
+                pw_hash: $pw_hash, pw_salt: $salt,
+                created_at: $ts
+            })""",
+            {
+                "user_id": user_id,
+                "username": username.strip().lower(),
+                "display_name": display_name.strip() or username.strip(),
+                "pw_hash": pw_hash, "salt": salt, "ts": now,
+            },
+        )
+        if result["ok"]:
+            return {"ok": True, "user_id": user_id, "error": None}
+        return {"ok": False, "user_id": None, "error": result["error"]}
+
+    def authenticate_user(self, username: str, password: str) -> dict:
+        """Verify credentials. Returns {ok, user_id, display_name, error}."""
+        if not self._driver:
+            return {"ok": False, "user_id": None, "display_name": None, "error": "Neo4j not connected"}
+        rows = self.run_cypher(
+            """MATCH (u:PlatformUser {username: $username})
+            RETURN u.user_id AS user_id, u.display_name AS display_name,
+                   u.pw_hash AS pw_hash, u.pw_salt AS pw_salt""",
+            {"username": username.strip().lower()},
+        )
+        if not rows:
+            return {"ok": False, "user_id": None, "display_name": None, "error": "User not found"}
+        row = rows[0]
+        candidate_hash, _ = self._hash_password(password, salt=row["pw_salt"])
+        if candidate_hash != row["pw_hash"]:
+            return {"ok": False, "user_id": None, "display_name": None, "error": "Incorrect password"}
+        return {"ok": True, "user_id": row["user_id"], "display_name": row["display_name"], "error": None}
+
     # ── Chat History (Neo4j) ──────────────────────────────────────────────
 
-    def create_chat_session(self, title: str = "New Chat") -> dict:
+    def create_chat_session(self, title: str = "New Chat", user_id: str = None) -> dict:
         if not self._driver:
             return {"ok": False, "chat_id": None, "error": "Neo4j not connected"}
         chat_id = f"chat:{uuid.uuid4().hex[:12]}"
         now = datetime.utcnow().isoformat()
-        result = self.write_cypher(
-            """CREATE (c:ChatSession {
-                chat_id: $chat_id, title: $title,
-                created_at: $ts, updated_at: $ts
-            })""",
-            {"chat_id": chat_id, "title": title, "ts": now},
-        )
+        if user_id:
+            result = self.write_cypher(
+                """MATCH (u:PlatformUser {user_id: $user_id})
+                CREATE (c:ChatSession {
+                    chat_id: $chat_id, title: $title,
+                    created_at: $ts, updated_at: $ts
+                })
+                CREATE (u)-[:OWNS]->(c)""",
+                {"user_id": user_id, "chat_id": chat_id, "title": title, "ts": now},
+            )
+        else:
+            result = self.write_cypher(
+                """CREATE (c:ChatSession {
+                    chat_id: $chat_id, title: $title,
+                    created_at: $ts, updated_at: $ts
+                })""",
+                {"chat_id": chat_id, "title": title, "ts": now},
+            )
         return {"ok": result["ok"], "chat_id": chat_id if result["ok"] else None, "error": result["error"]}
 
     def update_chat_session_title(self, chat_id: str, title: str) -> dict:
@@ -531,7 +604,15 @@ class BackendClient:
         )
         return {"ok": result["ok"], "message_id": message_id if result["ok"] else None, "error": result["error"]}
 
-    def list_chat_sessions(self, limit: int = 30) -> list[dict]:
+    def list_chat_sessions(self, limit: int = 30, user_id: str = None) -> list[dict]:
+        if user_id:
+            return self.run_cypher(
+                """MATCH (u:PlatformUser {user_id: $user_id})-[:OWNS]->(c:ChatSession)
+                RETURN c.chat_id AS chat_id, c.title AS title,
+                       c.created_at AS created_at, c.updated_at AS updated_at
+                ORDER BY c.updated_at DESC LIMIT $limit""",
+                {"user_id": user_id, "limit": limit},
+            )
         return self.run_cypher(
             """MATCH (c:ChatSession)
             RETURN c.chat_id AS chat_id, c.title AS title,
@@ -546,6 +627,17 @@ class BackendClient:
             RETURN m.role AS role, m.content AS content,
                    m.position AS position, m.created_at AS created_at
             ORDER BY m.position ASC, m.created_at ASC""",
+            {"chat_id": chat_id},
+        )
+
+    def delete_chat_session(self, chat_id: str) -> dict:
+        """Delete a ChatSession and all its ChatMessage nodes + relationships."""
+        if not self._driver:
+            return {"ok": False, "error": "Neo4j not connected"}
+        return self.write_cypher(
+            """MATCH (c:ChatSession {chat_id: $chat_id})
+            OPTIONAL MATCH (c)-[:HAS_MESSAGE]->(m:ChatMessage)
+            DETACH DELETE m, c""",
             {"chat_id": chat_id},
         )
 

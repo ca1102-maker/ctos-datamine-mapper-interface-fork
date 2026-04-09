@@ -8,8 +8,10 @@ def page_home(client: BackendClient):
     st.markdown("## How can I help you today?")
     st.caption("Ask about semantic mappings, terminology, or explore our features.")
 
-    # Load chat sessions from Neo4j
-    st.session_state.chat_sessions = client.list_chat_sessions(limit=30)
+    # Load chat sessions from Neo4j (scoped to logged-in user)
+    st.session_state.chat_sessions = client.list_chat_sessions(
+        limit=30, user_id=st.session_state.get("logged_in_user_id"),
+    )
 
     # ── System Prompt Editor ──
     with st.expander("⚙️ Edit System Prompt", expanded=False):
@@ -70,21 +72,30 @@ def page_home(client: BackendClient):
                 chat_id = session.get("chat_id")
                 title = session.get("title") or "Untitled Chat"
                 is_current = st.session_state.current_chat_id == chat_id
-                label = f"🟢 {title[:35]}" if is_current else f"💬 {title[:35]}"
+                label = f"🟢 {title[:30]}" if is_current else f"💬 {title[:30]}"
 
-                if st.button(
-                    label,
-                    key=f"chat_session_{chat_id}",
-                    use_container_width=True,
-                    type="primary" if is_current else "secondary",
-                ):
-                    loaded = client.load_chat_messages(chat_id)
-                    st.session_state.current_chat_id = chat_id
-                    st.session_state.chat_messages = [
-                        {"role": msg["role"], "content": msg["content"]}
-                        for msg in loaded
-                    ]
-                    st.rerun()
+                btn_col, del_col = st.columns([5, 1])
+                with btn_col:
+                    if st.button(
+                        label,
+                        key=f"chat_session_{chat_id}",
+                        use_container_width=True,
+                        type="primary" if is_current else "secondary",
+                    ):
+                        loaded = client.load_chat_messages(chat_id)
+                        st.session_state.current_chat_id = chat_id
+                        st.session_state.chat_messages = [
+                            {"role": msg["role"], "content": msg["content"]}
+                            for msg in loaded
+                        ]
+                        st.rerun()
+                with del_col:
+                    if st.button("🗑️", key=f"del_{chat_id}", help="Delete this chat"):
+                        client.delete_chat_session(chat_id)
+                        if st.session_state.current_chat_id == chat_id:
+                            st.session_state.current_chat_id = None
+                            st.session_state.chat_messages = []
+                        st.rerun()
         else:
             st.caption("No previous chats yet.")
 
@@ -117,7 +128,10 @@ def _handle_user_message(client: BackendClient, user_input: str):
     """Create session if needed, save user message, get reply, save reply."""
     # Create new chat session if needed
     if st.session_state.current_chat_id is None:
-        created = client.create_chat_session(title=user_input[:60])
+        created = client.create_chat_session(
+            title=user_input[:60],
+            user_id=st.session_state.get("logged_in_user_id"),
+        )
         if created["ok"]:
             st.session_state.current_chat_id = created["chat_id"]
 
