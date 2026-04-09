@@ -103,7 +103,7 @@ frederick/
 
 - Python 3.10+
 - Access to the Neo4j instance at `fnl-llm-neo4j.tdm.gedges.rcac.purdue.edu`
-- (Optional) Ollama installed for local LLM inference
+- Ollama installed for local LLM inference
 - (Optional) Anthropic API key for Claude fallback
 
 ### 1. Clone & enter
@@ -173,7 +173,7 @@ The Benchmark page (`🏆 Benchmark` in sidebar) compares Frederick's mapping ac
 
 ---
 
-## Key Changes (Sprint 12 → Sprint 13)
+## Recent Changes
 
 - **User authentication** — `PlatformUser` nodes in Neo4j with hashed passwords. Login gate on app startup. Chat histories scoped per user.
 - **Chat deletion** — Delete individual chat sessions from the history panel.
