@@ -1,4 +1,4 @@
-# 🧬 Frederick Platform
+# 🧬 FNL Mapper
 
 Medical terminology mapping platform built on **Neo4j**, **Streamlit**, and **LangChain**.
 Maps raw clinical data terms to standardized NCIT/caDSR terminology via exact, fuzzy, synonym, and semantic search — with a built-in LLM agent for conversational querying.
