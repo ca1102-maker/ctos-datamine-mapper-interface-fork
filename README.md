@@ -128,7 +128,7 @@ cp config/eg.env .env
 pip install -r requirements.txt
 ```
 
-### 4. Set up Ollama (one-time, optional)
+### 4. Set up Ollama
 
 Request a high computer server (e.g. DatamineMAX VSCode 128 cores), could potentially run on smaller datamine 16 node session, but VERY slowly
 
