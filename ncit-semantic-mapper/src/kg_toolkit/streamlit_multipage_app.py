@@ -49,11 +49,10 @@ def main():
         
         st.markdown("**Backend Status**")
         neo4j_status = "✅ Connected" if os.getenv("NEO4J_URI") else "❌ Not Configured"
-        # A simple check for Ollama is to see if the host is set (for remote) or just assume local.
-        ollama_status = "✅ Connected" # Assume local/remote is configured
+        openai_status = "✅ Connected" if os.getenv("OPENAI_API_KEY") else "❌ Not Configured"
         
         st.write(f"Neo4j: {neo4j_status}")
-        st.write(f"Ollama: {ollama_status}")
+        st.write(f"OpenAI: {openai_status}")
         
         # Agent initialization button
         if st.button("🚀 Initialize Agent"):

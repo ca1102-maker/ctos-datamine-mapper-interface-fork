@@ -8,15 +8,16 @@ Updated for Ollama compatibility
 import os
 from dotenv import load_dotenv
 from typing import Optional
-from langchain.agents import create_react_agent, AgentExecutor
-from langchain_ollama import OllamaLLM  
+from langchain_classic.agents import AgentExecutor
+from langchain.agents import create_agent as create_react_agent
+from langchain_openai import ChatOpenAI  
 from langchain_core.tools import BaseTool
 from langchain_core.callbacks import (
     AsyncCallbackManagerForToolRun,
     CallbackManagerForToolRun,
 )
 from langchain_core.prompts import PromptTemplate
-from langchain.memory import ConversationBufferMemory
+from langchain_classic.memory import ConversationBufferMemory
 from pydantic import BaseModel, Field
 
 from .synonym_tool import get_synonyms
@@ -449,12 +450,13 @@ class SemanticNCITDefinitionTool(BaseTool):
         return self._run(query, run_manager=run_manager.get_sync() if run_manager else None)
 
 
-def create_fresh_agent(model_name="llama3.1-64"):
+def create_fresh_agent(model_name="gpt-4o"):
     Config.validate()
     
-    llm = OllamaLLM(
-        model=model_name,
-        temperature=0
+    llm = ChatOpenAI(
+        model="gpt-4o",
+        temperature=0,
+	api_key=os.getenv("OPENAI_API_KEY")
     )
     
     tools =[
@@ -547,7 +549,7 @@ def create_fresh_agent(model_name="llama3.1-64"):
                           "tool_names": ", ".join([tool.name for tool in tools])}
     )
     
-    agent = create_react_agent(llm, tools, prompt)
+    agent = create_react_agent(llm, tools)
     
     # --- CRITICAL FIX: Lower max_iterations and use early_stopping ---
     agent_executor = AgentExecutor(

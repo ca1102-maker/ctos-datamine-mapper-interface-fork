@@ -1,0 +1,4 @@
+.env
+ncit-semantic-mapper/.env
+__pycache__/
+*.pyc

@@ -1,4 +1,4 @@
-"""Sidebar: backend status, model config with Ollama model discovery, navigation."""
+"""Sidebar: backend status, model config with OpenAI model selection, navigation."""
 
 import streamlit as st
 import requests
@@ -19,23 +19,13 @@ NAV_GROUPS = {
     },
 }
 
-# Default fallback list if Ollama API is unreachable
-FALLBACK_MODELS = ["llama3.1-64", "llama3.1", "qwen2.5", "mistral", "codellama"]
+# Available OpenAI models
+FALLBACK_MODELS = ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo"]
 
 
-def _fetch_ollama_models() -> list[str]:
-    """Query the Ollama API for locally installed models."""
-    if "ollama_models" in st.session_state:
-        return st.session_state["ollama_models"]
-    try:
-        resp = requests.get("http://localhost:11434/api/tags", timeout=3)
-        resp.raise_for_status()
-        models = [m["name"] for m in resp.json().get("models", [])]
-        models.sort()
-        st.session_state["ollama_models"] = models if models else FALLBACK_MODELS
-    except Exception:
-        st.session_state["ollama_models"] = FALLBACK_MODELS
-    return st.session_state["ollama_models"]
+def _fetch_openai_models() -> list[str]:
+    """Return available OpenAI models."""
+    return FALLBACK_MODELS
 
 
 def render_sidebar(client: BackendClient):
@@ -65,7 +55,7 @@ def render_sidebar(client: BackendClient):
         with cols[2]:
             st.caption(f"Semantic: {'✅' if status['semantic_ready'] else '❌'}")
 
-        st.caption(f"Ollama LLM: {'✅ Ready' if status.get('ollama_ready') else '⏳ Not tested yet'}")
+        st.caption(f"OpenAI: {"✅ Ready" if status.get("openai_ready") else "⏳ Not tested yet"}")
         st.caption(f"Claude API: {'✅ Key set' if status.get('claude_ready') else '❌ No API key'}")
 
         st.markdown("---")
@@ -73,7 +63,7 @@ def render_sidebar(client: BackendClient):
         # ── Model configuration ──
         st.markdown("**🧠 Model Configuration**")
 
-        available_models = _fetch_ollama_models()
+        available_models = FALLBACK_MODELS
 
         # Agent model selector
         default_agent = st.session_state.get("agent_model", "llama3.1-64")
@@ -82,7 +72,7 @@ def render_sidebar(client: BackendClient):
             "Reasoning Model (Agent)",
             available_models,
             index=agent_idx,
-            help="Select which locally installed Ollama model to use for the chat agent.",
+            help="Select which OpenAI model to use for the chat agent.",
         )
 
         # Cypher model selector
@@ -92,7 +82,7 @@ def render_sidebar(client: BackendClient):
             "Cypher Gen Model (Fast)",
             available_models,
             index=cypher_idx,
-            help="Select which model to use for Natural Language to Cypher generation.",
+            help="Select which OpenAI model to use for Natural Language to Cypher generation.",
         )
 
         st.session_state["agent_model"] = agent_model
@@ -100,8 +90,7 @@ def render_sidebar(client: BackendClient):
 
         # Refresh model list button
         if st.button("🔄 Refresh models", use_container_width=True):
-            if "ollama_models" in st.session_state:
-                del st.session_state["ollama_models"]
+            pass
             st.rerun()
 
         # Swap agent if model changed or not yet initialized

@@ -687,26 +687,23 @@ Examples:
   A: MATCH (ncit:NCIT {code:'C4878'})<-[:HAS_CONCEPT]-(pv:PV)<-[:HAS_PV]-(vdm:VDM)<-[:HAS_VDM]-(cde:CDE) RETURN cde.code AS cde_code, cde.term AS cde_term, pv.term AS pv_term LIMIT 25
 """
 
-    def _get_ollama(self, cypher_model="llama3.1"):
-        if self._ollama_available is False:
-            return None
+    def _get_ollama(self, cypher_model="gpt-4o"):
         if self._ollama_llm is not None and getattr(self, "current_cypher_model", None) == cypher_model:
             return self._ollama_llm
         try:
-            from langchain_ollama import OllamaLLM
-            llm = OllamaLLM(model=cypher_model, temperature=0)
-            llm.invoke("RETURN 1")
+            from langchain_openai import ChatOpenAI
+            llm = ChatOpenAI(model=cypher_model, temperature=0, api_key=os.getenv("OPENAI_API_KEY"))
             BackendClient._ollama_llm = llm
             BackendClient._ollama_available = True
             self.current_cypher_model = cypher_model
             return llm
         except Exception as e:
             BackendClient._ollama_available = False
-            print(f"[BackendClient] Ollama unavailable: {e}")
+            print(f"[BackendClient] OpenAI unavailable: {e}")
             return None
 
     @property
-    def ollama_ready(self) -> bool:
+    def openai_ready(self) -> bool:
         return self._ollama_available is True or (
             self._ollama_available is None and self._get_ollama() is not None
         )
@@ -729,7 +726,7 @@ Examples:
                     cleaned = match2.group(0).strip()
                 if "RETURN" in cleaned.upper():
                     cypher = cleaned
-                    method = "ollama"
+                    method = "openai"
             except Exception as e:
                 print(f"[nl_to_cypher] Ollama call failed: {e}")
 
@@ -894,7 +891,7 @@ Examples:
             "synonym_ready": self._synonyms is not None,
             "semantic_ready": self._searcher is not None,
             "agent_ready": self.agent_ready,
-            "ollama_ready": self._ollama_available is True,
+            "openai_ready": self._ollama_available is True,
             "claude_ready": self.claude_ready,
             "error": self.error,
         }

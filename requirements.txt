@@ -1,11 +1,33 @@
 # Frederick Platform — Python dependencies
-streamlit>=1.30.0
-plotly>=5.18.0
-pandas>=2.1.0
-numpy>=1.24.0
-python-dotenv>=1.0.0
-neo4j>=5.14.0
+# Generated from working venv (pip freeze) on fnl-internship VM
 
-# Optional — required only when using LLM features
-# langchain-ollama>=0.1.0
-# langchain>=0.2.0
+# --- Core app ---
+streamlit==1.58.0
+plotly==6.8.0
+pandas==3.0.3
+numpy==2.4.6
+python-dotenv==1.2.2
+
+# --- Database ---
+neo4j==6.2.0
+
+# --- LangChain / LangGraph (OpenAI-based agent + NL-to-Cypher) ---
+langchain==1.3.2
+langchain-classic==1.0.7
+langchain-core==1.4.0
+langchain-openai==1.2.2
+langchain-text-splitters==1.1.2
+langgraph==1.2.2
+langgraph-checkpoint==4.1.1
+langgraph-prebuilt==1.1.0
+
+# --- Anthropic (Claude fallback / user-supplied key) ---
+anthropic==0.40.0
+
+# --- OpenAI (direct client, used by some kg_toolkit modules) ---
+openai==2.38.0
+
+# --- Supporting libraries ---
+pydantic==2.13.4
+requests==2.34.2
+tiktoken==0.13.0

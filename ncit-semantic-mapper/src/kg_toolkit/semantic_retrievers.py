@@ -3,7 +3,7 @@ from neo4j import GraphDatabase
 import numpy as np
 from dotenv import load_dotenv
 
-from langchain_ollama.embeddings import OllamaEmbeddings
+from langchain_openai import OpenAIEmbeddings
 
 #load_dotenv()
 
@@ -17,7 +17,7 @@ class SemanticSearcher:
         if not all([self.uri, self.username, self.password]):
             raise ValueError("Neo4j credentials not provided or found in environment variables.")
             
-        self.embedding_client = OllamaEmbeddings(model="nomic-embed-text-64")
+        self.embedding_client = OpenAIEmbeddings(model="text-embedding-3-small", api_key=os.getenv("OPENAI_API_KEY"))
         
         # Initialize Neo4j driver
         self.driver = GraphDatabase.driver(
