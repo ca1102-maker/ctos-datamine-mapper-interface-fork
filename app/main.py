@@ -5,6 +5,9 @@ Run with:  streamlit run app/main.py
 """
 import sys
 import os
+# Adding repo root to path so 'app' package is findable
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+# Adding kg_toolkit to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'ncit-semantic-mapper', 'src'))
 import streamlit as st
 
