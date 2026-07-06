@@ -24,6 +24,7 @@ from datetime import datetime
 from typing import Optional
 
 from dotenv import load_dotenv
+import streamlit as st
 
 from app.services.models import MatchResult, GraphPayload
 
@@ -128,9 +129,9 @@ class BackendClient:
 
     def query_claude(self, user_message: str, system_prompt: str = None) -> str:
         """Send a message to the Anthropic Claude API. Returns the response text."""
-        api_key = os.getenv("ANTHROPIC_API_KEY", "")
+        api_key = st.session_state.get("anthropic_api_key") or os.getenv("ANTHROPIC_API_KEY", "")
         if not api_key:
-            return "Claude API key not set. Add ANTHROPIC_API_KEY to your .env file."
+            return "Claude API key not set. Please enter your Anthropic API key in the sidebar."
         try:
             import requests
             resp = requests.post(
@@ -141,7 +142,7 @@ class BackendClient:
                     "content-type": "application/json",
                 },
                 json={
-                    "model": os.getenv("CLAUDE_MODEL", "claude-sonnet-4-20250514"),
+                    "model": st.session_state.get("agent_model", os.getenv("CLAUDE_MODEL", "claude-sonnet-4-5")),
                     "max_tokens": 1024,
                     "system": system_prompt or self.GRAPH_SCHEMA_PROMPT,
                     "messages": [{"role": "user", "content": user_message}],
@@ -159,7 +160,7 @@ class BackendClient:
 
     @property
     def claude_ready(self) -> bool:
-        return bool(os.getenv("ANTHROPIC_API_KEY"))
+        return bool(st.session_state.get("anthropic_api_key") or os.getenv("ANTHROPIC_API_KEY"))
 
     def chat_query(self, user_message: str, system_prompt: str = None) -> str:
         """
@@ -692,7 +693,7 @@ Examples:
             return self._ollama_llm
         try:
             from langchain_openai import ChatOpenAI
-            llm = ChatOpenAI(model=cypher_model, temperature=0, api_key=os.getenv("OPENAI_API_KEY"))
+            llm = ChatOpenAI(model=cypher_model, temperature=0, api_key=st.session_state.get("openai_api_key") or os.getenv("OPENAI_API_KEY"))
             BackendClient._ollama_llm = llm
             BackendClient._ollama_available = True
             self.current_cypher_model = cypher_model

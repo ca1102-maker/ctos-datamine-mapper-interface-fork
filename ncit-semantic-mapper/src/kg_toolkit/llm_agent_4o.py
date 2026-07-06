@@ -7,6 +7,10 @@ Updated for Ollama compatibility
 
 import os
 from dotenv import load_dotenv
+try:
+    import streamlit as st
+except ImportError:
+    st = None
 from typing import Optional
 from langchain_classic.agents import AgentExecutor
 from langchain.agents import create_agent as create_react_agent
@@ -456,7 +460,7 @@ def create_fresh_agent(model_name="gpt-4o"):
     llm = ChatOpenAI(
         model="gpt-4o",
         temperature=0,
-	api_key=os.getenv("OPENAI_API_KEY")
+	api_key=st.session_state.get("openai_api_key") if hasattr(st, "session_state") else os.getenv("OPENAI_API_KEY")
     )
     
     tools =[
