@@ -19,13 +19,19 @@ NAV_GROUPS = {
     },
 }
 
-# Available OpenAI models
-FALLBACK_MODELS = ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo"]
+# Available models
+OPENAI_MODELS = ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo"]
+ANTHROPIC_MODELS = ["claude-opus-4-5", "claude-sonnet-4-5", "claude-haiku-4-5"]
 
 
-def _fetch_openai_models() -> list[str]:
-    """Return available OpenAI models."""
-    return FALLBACK_MODELS
+def _get_available_models() -> list[str]:
+    """Return available models based on which API keys the user has provided."""
+    models = []
+    if st.session_state.get("openai_api_key"):
+        models.extend(OPENAI_MODELS)
+    if st.session_state.get("anthropic_api_key"):
+        models.extend(ANTHROPIC_MODELS)
+    return models
 
 
 def render_sidebar(client: BackendClient):
@@ -60,30 +66,59 @@ def render_sidebar(client: BackendClient):
 
         st.markdown("---")
 
+        # ── API Keys ──
+        st.markdown("**🔑 API Keys**")
+        openai_key = st.text_input(
+            "OpenAI API Key",
+            value=st.session_state.get("openai_api_key", ""),
+            type="password",
+            placeholder="sk-...",
+            help="Required for GPT models"
+        )
+        anthropic_key = st.text_input(
+            "Anthropic API Key",
+            value=st.session_state.get("anthropic_api_key", ""),
+            type="password",
+            placeholder="sk-ant-...",
+            help="Required for Claude models"
+        )
+        if openai_key:
+            st.session_state["openai_api_key"] = openai_key
+        if anthropic_key:
+            st.session_state["anthropic_api_key"] = anthropic_key
+
+        st.markdown("---")
+
         # ── Model configuration ──
         st.markdown("**🧠 Model Configuration**")
 
-        available_models = FALLBACK_MODELS
+        available_models = _get_available_models()
 
-        # Agent model selector
-        default_agent = st.session_state.get("agent_model", "llama3.1-64")
-        agent_idx = available_models.index(default_agent) if default_agent in available_models else 0
-        agent_model = st.selectbox(
-            "Reasoning Model (Agent)",
-            available_models,
-            index=agent_idx,
-            help="Select which OpenAI model to use for the chat agent.",
-        )
+	if not available_models:
+            st.warning("Enter an API key above to enable model selection.")
+            agent_model = None
+            cypher_model = None
+        else:
+            # Agent model selector
+            default_agent = st.session_state.get("agent_model", available_models[0])
+            agent_idx = available_models.index(default_agent) if default_agent in available_models else 0
+            agent_model = st.selectbox(
+                "Reasoning Model (Agent)",
+                available_models,
+                index=agent_idx,
+                help="Models available based on your API keys.",
+            )
 
-        # Cypher model selector
-        default_cypher = st.session_state.get("cypher_model", "llama3.1-64")
-        cypher_idx = available_models.index(default_cypher) if default_cypher in available_models else 0
-        cypher_model = st.selectbox(
-            "Cypher Gen Model (Fast)",
-            available_models,
-            index=cypher_idx,
-            help="Select which OpenAI model to use for Natural Language to Cypher generation.",
-        )
+            # Cypher model selector
+            default_cypher = st.session_state.get("cypher_model", available_models[0])
+            cypher_idx = available_models.index(default_cypher) if default_cypher in available_models else 0
+            cypher_model = st.selectbox(
+                "Cypher Gen Model (Fast)",
+                available_models,
+                index=cypher_idx,
+                help="Models available based on your API keys.",
+            )
+
 
         st.session_state["agent_model"] = agent_model
         st.session_state["cypher_model"] = cypher_model
@@ -95,7 +130,7 @@ def render_sidebar(client: BackendClient):
 
         # Swap agent if model changed or not yet initialized
         current_model = getattr(client, "current_agent_model", None)
-        if not status["agent_ready"] or current_model != agent_model:
+        if agent_model and (not status["agent_ready"] or current_model != agent_model):
             with st.spinner(f"Loading {agent_model}..."):
                 client.init_agent(model_name=agent_model)
 
