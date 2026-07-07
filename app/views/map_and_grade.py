@@ -60,6 +60,72 @@ def _parse_upload(uploaded) -> list[str]:
             terms.append(t)
     return terms
 
+def _clean_terms(terms: list[str],
+                 strip_quotes: bool = True,
+                 strip_whitespace: bool = True,
+                 remove_datetime: bool = True,
+                 split_icd_codes: bool = True,
+                 remove_duplicates: bool = True) -> tuple[list[str], dict]:
+    """Clean a list of terms and return cleaned terms + a summary of changes."""
+    import re
+    original_count = len(terms)
+    cleaned = []
+    removed = []
+    stats = {}
+
+    code_token = re.compile(r'\d{4}/\d+')
+    datetime_pattern = re.compile(r'^\d{4}-\d{2}-\d{2}')
+
+    for term in terms:
+        t = str(term)
+
+        # Remove datetime rows
+        if remove_datetime and datetime_pattern.match(t.strip()):
+            removed.append(t)
+            continue
+
+        # Strip whitespace
+        if strip_whitespace:
+            t = t.strip()
+
+        # Strip quotes
+        if strip_quotes:
+            t = t.replace('"', '').replace("'", '')
+
+        # Skip empty
+        if not t:
+            removed.append(term)
+            continue
+
+        # Split dual ICD-O codes into separate rows
+        if split_icd_codes:
+            positions = [m.start() for m in code_token.finditer(t)]
+            if len(positions) == 2:
+                second_start = positions[1]
+                first_part = t[:second_start].rstrip(', ').strip()
+                second_part = t[second_start:].strip()
+                cleaned.extend([first_part, second_part])
+                continue
+
+        cleaned.append(t)
+
+    # Remove duplicates
+    if remove_duplicates:
+        seen = set()
+        deduped = []
+        for t in cleaned:
+            if t.lower() not in seen:
+                seen.add(t.lower())
+                deduped.append(t)
+        cleaned = deduped
+
+    stats = {
+        "original": original_count,
+        "removed": len(removed),
+        "final": len(cleaned),
+        "removed_items": removed[:10]  # show first 10 removed for preview
+    }
+    return cleaned, stats
 
 def _run_search(client: BackendClient, term: str, search_mode: str, top_k: int) -> list[dict]:
     """Run the search cascade for a single term."""
@@ -175,6 +241,48 @@ def page_map_and_grade(client: BackendClient):
         if uploaded:
             terms = _parse_upload(uploaded)
             st.info(f"Parsed **{len(terms)}** unique terms from `{uploaded.name}`")
+            # ── Step 0: Clean Data ──
+            with st.expander("🧹 Clean Data (recommended before mapping)", expanded=True):
+                col1, col2 = st.columns(2)
+                with col1:
+                    strip_quotes = st.checkbox("Remove quotes (' and \")", value=True)
+                    strip_whitespace = st.checkbox("Strip whitespace", value=True)
+                    remove_datetime = st.checkbox("Remove datetime rows", value=True)
+                with col2:
+                    split_icd = st.checkbox("Split dual ICD-O codes into separate rows", value=True)
+                    remove_dupes = st.checkbox("Remove duplicates", value=True)
+
+                if st.button("🧹 Preview Cleaned Data", key="preview_clean"):
+                    cleaned, stats = _clean_terms(
+                        terms,
+                        strip_quotes=strip_quotes,
+                        strip_whitespace=strip_whitespace,
+                        remove_datetime=remove_datetime,
+                        split_icd_codes=split_icd,
+                        remove_duplicates=remove_dupes
+                    )
+                    st.session_state["cleaned_terms"] = cleaned
+                    st.session_state["clean_stats"] = stats
+
+                if "clean_stats" in st.session_state:
+                    stats = st.session_state["clean_stats"]
+                    st.success(f"✅ {stats['final']} terms ready to map "
+                               f"({stats['removed']} removed from original {stats['original']})")
+                    if stats["removed_items"]:
+                        with st.expander(f"Removed rows (showing first {len(stats['removed_items'])})"):
+                            for r in stats["removed_items"]:
+                                st.caption(r)
+                    preview_df = pd.DataFrame(
+                        st.session_state["cleaned_terms"][:20],
+                        columns=["Term"]
+                    )
+                    st.dataframe(preview_df, use_container_width=True, hide_index=True)
+                    st.caption(f"Showing first 20 of {stats['final']} terms")
+
+                    # Apply cleaned terms
+                    if st.button("✅ Use Cleaned Data", key="apply_clean"):
+                        terms = st.session_state["cleaned_terms"]
+                        st.success("Cleaned data applied!")
             if terms:
                 with st.expander("Preview parsed terms", expanded=False):
                     st.write(terms[:50])

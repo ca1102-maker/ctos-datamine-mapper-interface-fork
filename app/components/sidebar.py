@@ -94,7 +94,7 @@ def render_sidebar(client: BackendClient):
 
         available_models = _get_available_models()
 
-	if not available_models:
+        if not available_models:
             st.warning("Enter an API key above to enable model selection.")
             agent_model = None
             cypher_model = None
