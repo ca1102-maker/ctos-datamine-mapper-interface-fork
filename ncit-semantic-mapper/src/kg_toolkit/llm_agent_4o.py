@@ -569,8 +569,10 @@ def create_fresh_agent(model_name="gpt-4o"):
 
 def map_raw_data_isolated(agent_executor, system_prompt, raw_value):
     try:
-        response = agent_executor.invoke({"input": f"Raw medical data value to map: \"{raw_value}\""})
-        return response["output"]
+        result = agent_executor.invoke({
+            "messages": [{"role": "user", "content": f"Raw medical data value to map: \"{raw_value}\""}]
+        })
+        return result["messages"][-1].content
     except Exception as e:
         return f"Error processing mapping: {str(e)}"
 
