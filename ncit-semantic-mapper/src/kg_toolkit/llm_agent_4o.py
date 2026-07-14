@@ -12,8 +12,7 @@ try:
 except ImportError:
     st = None
 from typing import Optional
-from langchain_classic.agents import AgentExecutor
-from langchain.agents import create_agent as create_react_agent
+from langgraph.prebuilt import create_react_agent
 from langchain_openai import ChatOpenAI  
 from langchain_core.tools import BaseTool
 from langchain_core.callbacks import (
@@ -553,26 +552,26 @@ def create_fresh_agent(model_name="gpt-4o"):
                           "tool_names": ", ".join([tool.name for tool in tools])}
     )
     
-    agent = create_react_agent(llm, tools)
-    
-    # --- CRITICAL FIX: Lower max_iterations and use early_stopping ---
-    agent_executor = AgentExecutor(
-        agent=agent,
-        tools=tools,
-        verbose=True,
-        handle_parsing_errors=True,
-        max_iterations=5, 
-        early_stopping_method="generate"
-    )
-    
-    return agent_executor, prompt_template
+    agent_executor = create_react_agent(llm, tools)
+
+    return agent_executor, ""
+
 
 def map_raw_data_isolated(agent_executor, system_prompt, raw_value):
     try:
         result = agent_executor.invoke({
             "messages": [{"role": "user", "content": f"Raw medical data value to map: \"{raw_value}\""}]
         })
-        return result["messages"][-1].content
+        # Handle different response formats
+        if isinstance(result, dict):
+            if "messages" in result:
+                messages = result["messages"]
+                if messages:
+                    last = messages[-1]
+                    return last.content if hasattr(last, "content") else str(last)
+            if "output" in result:
+                return result["output"]
+        return str(result)
     except Exception as e:
         return f"Error processing mapping: {str(e)}"
 
