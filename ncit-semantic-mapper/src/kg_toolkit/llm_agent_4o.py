@@ -460,7 +460,7 @@ def create_fresh_agent(model_name="gpt-4o"):
     llm = ChatOpenAI(
         model="gpt-4o",
         temperature=0,
-	api_key=st.session_state.get("openai_api_key") if hasattr(st, "session_state") else os.getenv("OPENAI_API_KEY")
+	api_key=str(st.session_state.get("openai_api_key") or os.getenv("OPENAI_API_KEY", "")) if hasattr(st, "session_state") else str(os.getenv("OPENAI_API_KEY", ""))
     )
     
     tools =[

@@ -693,7 +693,7 @@ Examples:
             return self._ollama_llm
         try:
             from langchain_openai import ChatOpenAI
-            llm = ChatOpenAI(model=cypher_model, temperature=0, api_key=st.session_state.get("openai_api_key") or os.getenv("OPENAI_API_KEY"))
+            llm = ChatOpenAI(model=cypher_model, temperature=0, api_key=str(st.session_state.get("openai_api_key") or os.getenv("OPENAI_API_KEY", "")))
             BackendClient._ollama_llm = llm
             BackendClient._ollama_available = True
             self.current_cypher_model = cypher_model
