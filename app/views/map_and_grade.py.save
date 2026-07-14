@@ -239,12 +239,8 @@ def page_map_and_grade(client: BackendClient):
             help="One term per line, or CSV with terms in the first column.",
         )
         if uploaded:
-            raw_terms = _parse_upload(uploaded)
-            # Use cleaned terms if available, otherwise use raw
-            terms = st.session_state.get("cleaned_terms") if st.session_state.get("use_cleaned") else raw_terms
-            st.info(f"Parsed **{len(raw_terms)}** unique terms from `{uploaded.name}`")
-            if "cleaned_terms" in st.session_state:
-                st.success(f"✅ Using cleaned data: **{len(terms)}** terms")
+            terms = _parse_upload(uploaded)
+            st.info(f"Parsed **{len(terms)}** unique terms from `{uploaded.name}`")
             # ── Step 0: Clean Data ──
             with st.expander("🧹 Clean Data (recommended before mapping)", expanded=True):
                 col1, col2 = st.columns(2)
@@ -277,7 +273,7 @@ def page_map_and_grade(client: BackendClient):
                             for r in stats["removed_items"]:
                                 st.caption(r)
                     preview_df = pd.DataFrame(
-                        st.session_state.get("cleaned_terms", [])[:20],
+                        st.session_state["cleaned_terms"][:20],
                         columns=["Term"]
                     )
                     st.dataframe(preview_df, use_container_width=True, hide_index=True)
@@ -285,13 +281,8 @@ def page_map_and_grade(client: BackendClient):
 
                     # Apply cleaned terms
                     if st.button("✅ Use Cleaned Data", key="apply_clean"):
-                        st.session_state["use_cleaned"] = True
-                        st.rerun()
-                    if st.session_state.get("use_cleaned"):
-                        if st.button("↩️ Reset to raw data", key="reset_clean"):
-                            st.session_state.pop("use_cleaned", None)
-                            st.session_state.pop("cleaned_terms", None)
-                            st.rerun()
+                        terms = st.session_state["cleaned_terms"]
+                        st.success("Cleaned data applied!")
             if terms:
                 with st.expander("Preview parsed terms", expanded=False):
                     st.write(terms[:50])
