@@ -109,9 +109,9 @@ def page_home(client: BackendClient):
         # Suggested prompts (only when empty)
         if not st.session_state.chat_messages:
             suggested = [
-                "Tell me more about semantic mapping in medical terminology",
-                "Explain common terminology mapping approaches",
-                "Help me understand Neo4j graph relationships",
+                "Map 'lung carcinoma' to NCIT terminology",
+                "Find synonyms for 'prostatic adenocarcinoma'",
+                "What NCIT code corresponds to 'glioblastoma'?",
             ]
             for prompt in suggested:
                 if st.button(f"🔍  {prompt}", key=f"suggest_{prompt[:20]}", use_container_width=True):
