@@ -4,6 +4,10 @@ import numpy as np
 from dotenv import load_dotenv
 
 from langchain_openai import OpenAIEmbeddings
+try:
+    import streamlit as st
+except ImportError:
+    st = None
 
 #load_dotenv()
 
@@ -17,7 +21,9 @@ class SemanticSearcher:
         if not all([self.uri, self.username, self.password]):
             raise ValueError("Neo4j credentials not provided or found in environment variables.")
             
-        self.embedding_client = OpenAIEmbeddings(model="text-embedding-3-small", api_key=os.getenv("OPENAI_API_KEY"))
+        # Semantic search always uses OpenAI ada-002 since vectors in Neo4j were pre-computed with this model
+	openai_key = (st.session_state.get("openai_api_key") if hasattr(st, "session_state") else None) or os.getenv("OPENAI_API_KEY", "")
+	self.embedding_client = OpenAIEmbeddings(model="text-embedding-ada-002", api_key=openai_key)
         
         # Initialize Neo4j driver
         self.driver = GraphDatabase.driver(

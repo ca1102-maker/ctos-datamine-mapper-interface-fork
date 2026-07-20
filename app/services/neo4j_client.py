@@ -693,14 +693,20 @@ Examples:
             return self._ollama_llm
         try:
             from langchain_openai import ChatOpenAI
-            llm = ChatOpenAI(model=cypher_model, temperature=0, api_key=str(st.session_state.get("openai_api_key") or os.getenv("OPENAI_API_KEY", "")))
+            if cypher_model.startswith("claude"):
+                from langchain_anthropic import ChatAnthropic
+                api_key = str(st.session_state.get("anthropic_api_key") or os.getenv("ANTHROPIC_API_KEY", ""))
+                llm = ChatAnthropic(model=cypher_model, temperature=0, api_key=api_key)
+            else:
+                api_key = str(st.session_state.get("openai_api_key") or os.getenv("OPENAI_API_KEY", ""))
+                llm = ChatOpenAI(model=cypher_model, temperature=0, api_key=api_key)
             BackendClient._ollama_llm = llm
             BackendClient._ollama_available = True
             self.current_cypher_model = cypher_model
             return llm
         except Exception as e:
             BackendClient._ollama_available = False
-            print(f"[BackendClient] OpenAI unavailable: {e}")
+            print(f"[BackendClient] LLM unavailable: {e}")
             return None
 
     @property

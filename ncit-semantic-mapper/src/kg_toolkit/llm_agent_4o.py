@@ -456,11 +456,24 @@ class SemanticNCITDefinitionTool(BaseTool):
 def create_fresh_agent(model_name="gpt-4o"):
     Config.validate()
     
-    llm = ChatOpenAI(
-        model="gpt-4o",
-        temperature=0,
-	api_key=str(st.session_state.get("openai_api_key") or os.getenv("OPENAI_API_KEY", "")) if hasattr(st, "session_state") else str(os.getenv("OPENAI_API_KEY", ""))
-    )
+    # Route to correct provider based on model name
+    is_claude = model_name.startswith("claude")
+
+    if is_claude:
+        from langchain_anthropic import ChatAnthropic
+        api_key = str(st.session_state.get("anthropic_api_key") or os.getenv("ANTHROPIC_API_KEY", "")) if hasattr(st, "session_state") else str(os.getenv("ANTHROPIC_API_KEY", ""))
+        llm = ChatAnthropic(
+            model=model_name,
+            temperature=0,
+            api_key=api_key
+        )
+    else:
+        api_key = str(st.session_state.get("openai_api_key") or os.getenv("OPENAI_API_KEY", "")) if hasattr(st, "session_state") else str(os.getenv("OPENAI_API_KEY", ""))
+        llm = ChatOpenAI(
+            model=model_name,
+            temperature=0,
+            api_key=api_key
+        )
     
     tools =[
         TermMatcherTool(), NodeMatcherTool(), FuzzyTermMatcherTool(),
