@@ -65,6 +65,7 @@ def _clean_terms(terms: list[str],
                  strip_whitespace: bool = True,
                  remove_datetime: bool = True,
                  split_icd_codes: bool = True,
+                 split_pipe_values: bool = True,
                  remove_duplicates: bool = True) -> tuple[list[str], dict]:
     """Clean a list of terms and return cleaned terms + a summary of changes."""
     import re
@@ -107,7 +108,14 @@ def _clean_terms(terms: list[str],
                 cleaned.extend([first_part, second_part])
                 continue
 
-        cleaned.append(t)
+        # Split pipe-separated values into separate rows
+        if "|" in t:
+            for part in t.split("|"):
+                part = part.strip()
+                if part:
+                    cleaned.append(part)
+        else:
+            cleaned.append(t)
 
     # Remove duplicates
     if remove_duplicates:
@@ -254,6 +262,7 @@ def page_map_and_grade(client: BackendClient):
                     remove_datetime = st.checkbox("Remove datetime rows", value=True)
                 with col2:
                     split_icd = st.checkbox("Split dual ICD-O codes into separate rows", value=True)
+                    split_pipe = st.checkbox("Split pipe-separated values (|) into separate rows", value=True)
                     remove_dupes = st.checkbox("Remove duplicates", value=True)
 
                 if st.button("🧹 Preview Cleaned Data", key="preview_clean"):
@@ -263,6 +272,7 @@ def page_map_and_grade(client: BackendClient):
                         strip_whitespace=strip_whitespace,
                         remove_datetime=remove_datetime,
                         split_icd_codes=split_icd,
+                        split_pipe_values=split_pipe,
                         remove_duplicates=remove_dupes
                     )
                     st.session_state["cleaned_terms"] = cleaned
