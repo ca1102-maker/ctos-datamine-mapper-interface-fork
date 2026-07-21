@@ -187,7 +187,7 @@ The Benchmark page (`🏆 Benchmark` in sidebar) compares Frederick's mapping ac
 - **Multi-provider LLM routing** — neo4j_client.py and llm_agent_4o.py now detect the selected model and route to ChatOpenAI or ChatAnthropic accordingly. Cypher generation also supports both providers.
 - **Semantic search embedding fix ** — semantic_retrievers.py corrected to use text-embedding-ada-002 (matching the pre-computed vectors in Neo4j) instead of text-embedding-3-small. Semantic search now requires an OpenAI key regardless of the selected chat model.
 - **Data cleaning step in Map & Grade** — Added an integrated pre-mapping cleaning component that strips whitespace, removes quotes, filters datetime rows, deduplicates entries, and splits dual ICD-O codes into separate rows. Cleaned data persists across reruns via session state with options to preview, apply, and reset.
-- ** Suggested chat prompts updated** — Home page prompts replaced with medical mapping queries that properly exercise the agent's tools.
+- **Suggested chat prompts updated** — Home page prompts replaced with medical mapping queries that properly exercise the agent's tools.
 - **LangGraph agent migration** — llm_agent_4o.py migrated from AgentExecutor + old LangChain create_react_agent to LangGraph's create_react_agent, compatible with LangChain 1.3.x.
 - **Deployment** — App deployed on GCP VM at http://35.229.118.82:8501, accessible without SSH tunnel via GCP firewall rule allowing port 8501.
 - **Removed Ollama dependency** — ollama_setup.sh removed from required setup steps. langchain-ollama removed from dependencies. langchain-anthropic added.
